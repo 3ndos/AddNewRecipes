@@ -332,9 +332,14 @@ namespace AddNewRecipes
                         break;
                 }
                 i++;
+                if (i % percent == 0)
+                {
+                    sw.Stop();
+                    Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
+                    sw.Reset();
+                }
             }
-            try
-            {
+         
                 Console.WriteLine("Linking recipes to potion leveled lists");
                 IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
                 ILeveledItemGetter allList = lvlilists.ToList()[0];
@@ -363,18 +368,6 @@ namespace AddNewRecipes
                         state.PatchMod.LeveledItems.Set(li);
                     foreach (LeveledItem li in impurepotionRecipeLVLIs)
                         state.PatchMod.LeveledItems.Set(li);
-
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            if (i % percent == 0)
-            {
-                sw.Stop();
-                Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
-                sw.Reset();
-            }
         }
         private static IEnumerable<IIngredientGetter> getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
