@@ -209,7 +209,6 @@ namespace AddNewRecipes
             /* must split leveled lists because it can only hold 128 items */
             uint potionListCount = (potionCount / 128) + 1;
             LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionListCount];
-<<<<<<< HEAD
             uint masterpotionListCount = ((potionCount+poisonCount+impurepotionCount) / 128) / 128 + 1;
             LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionListCount];
             LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionListCount];
@@ -233,11 +232,6 @@ namespace AddNewRecipes
                 masterpotionRecipeLVLIentriesdata[k].Level = 1;
                 masterpotionRecipeLVLIentriesdata[k].Count = 1;
             }
-=======
-            LeveledItemEntry[] potionRecipeLVLIentries = new LeveledItemEntry[potionListCount];
-            LeveledItemEntryData[] potionRecipeLVLIentriesdata = new LeveledItemEntryData[potionListCount];
-            GlobalInt[] potionGlobals = new GlobalInt[potionListCount];
->>>>>>> master
             for (int l = 0; l < potionListCount; l++)
             {
                 potionRecipeLVLIentries[l] = new LeveledItemEntry();
@@ -297,10 +291,7 @@ namespace AddNewRecipes
             uint potionIndex = 0, poisonIndex = 0, impurepotionIndex = 0;
             foreach (IngrCombination ic in combinations)
             {
-<<<<<<< HEAD
                 sw.Start();
-=======
->>>>>>> master
                 if (i % percent == 0)
                     Console.WriteLine(i + " out of " + combinations.Count() + " recipes created.");
                 IBook newRecipe = noteTemplate.DeepCopy();
@@ -341,7 +332,6 @@ namespace AddNewRecipes
                         break;
                 }
                 i++;
-<<<<<<< HEAD
                 if (i % percent == 0)
                 {
                     sw.Stop();
@@ -350,16 +340,10 @@ namespace AddNewRecipes
                 }
             }
          
-=======
-            }
-            try
-            {
->>>>>>> master
                 Console.WriteLine("Linking recipes to potion leveled lists");
                 IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
                 ILeveledItemGetter allList = lvlilists.ToList()[0];
                 LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
-<<<<<<< HEAD
                 int startindex = 0;
                 int potionindex = 0, poisonindex = 0, impurepotionindex = 0;
                 for (int l = 0; l < masterpotionListCount; l++)
@@ -384,25 +368,6 @@ namespace AddNewRecipes
                         state.PatchMod.LeveledItems.Set(li);
                     foreach (LeveledItem li in impurepotionRecipeLVLIs)
                         state.PatchMod.LeveledItems.Set(li);
-=======
-                foreach (LeveledItem li in potionRecipeLVLIs)
-                    state.PatchMod.LeveledItems.Set(li);
-                foreach (LeveledItemEntry lie in potionRecipeLVLIentries)
-                    modifiedList.Entries?.Add(lie);
-                foreach (LeveledItem li in poisonRecipeLVLIs)
-                    state.PatchMod.LeveledItems.Set(li);
-                foreach (LeveledItemEntry lie in poisonRecipeLVLIentries)
-                    modifiedList.Entries?.Add(lie);
-                foreach (LeveledItem li in impurepotionRecipeLVLIs)
-                    state.PatchMod.LeveledItems.Set(li);
-                foreach (LeveledItemEntry lie in impurepotionRecipeLVLIentries)
-                    modifiedList.Entries?.Add(lie);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
->>>>>>> master
         }
         private static IEnumerable<IIngredientGetter> getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
