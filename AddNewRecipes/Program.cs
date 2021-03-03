@@ -297,7 +297,6 @@ namespace AddNewRecipes
             Dictionary<String, int> nameCache = new Dictionary<String, int>();
             foreach (IngrCombination ic in combinations)
             {
-                sw.Start();
                 if (i % percent == 0)
                     Console.WriteLine(i + " out of " + combinations.Count() + " recipes created.");
                 IBook newRecipe = noteTemplate.DeepCopy();
@@ -345,12 +344,6 @@ namespace AddNewRecipes
                         break;
                 }
                 i++;
-                if (i % percent == 0 || i == combinations.Count())
-                {
-                    sw.Stop();
-                    Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
-                    sw.Reset();
-                }
             }
 
             Console.WriteLine("Linking recipes to potion leveled lists");
@@ -363,9 +356,8 @@ namespace AddNewRecipes
             impurepotionIndex = 0;
             for (int l = 0; l < masterpotionRecipeListCount; l++)
             {
-                sw.Start();
                 LeveledItem ml = masterpotionRecipeLVLIs[l];
-                while (startindex - l < 128)
+                for (int k = 0; k < 128; k++)
                 {
                     if (potionIndex < potionRecipeLVLIentries.Count())
                         ml.Entries?.Add(potionRecipeLVLIentries[potionIndex++]);
@@ -376,15 +368,8 @@ namespace AddNewRecipes
                     else
                         break;
                 }
-                startindex += 128;
                 state.PatchMod.LeveledItems.Set(ml);
                 modifiedList.Entries?.Add(masterpotionRecipeLVLIentries[l]);
-                if (l % percent == 0)
-                {
-                    sw.Stop();
-                    Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
-                    sw.Reset();
-                }
             }
             foreach (LeveledItem li in potionRecipeLVLIs)
                 state.PatchMod.LeveledItems.Set(li);
