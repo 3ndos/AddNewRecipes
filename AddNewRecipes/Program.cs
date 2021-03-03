@@ -52,7 +52,7 @@ namespace AddNewRecipes
                     Console.WriteLine(i + " out of " + ingredients.Count() + " ingredients processed.");
                 }
                 List<IIngredientGetter> remainingingr = ingredients.Skip(i).ToList();
-                IEnumerable<IIngredientGetter> potionList = getIngredientsMatchingOneIngredient(enumerator.Current, remainingingr);
+                IIngredientGetter[] potionList = getIngredientsMatchingOneIngredient(enumerator.Current, remainingingr);
                 if (String.IsNullOrEmpty(enumerator.Current.Name?.String))
                 {
                     i++;
@@ -60,15 +60,16 @@ namespace AddNewRecipes
                 }
                 foreach (IIngredientGetter ingr in potionList)
                 {
-                    IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects);
+                    IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects).ToArray();
                     ActiveEffects = ActiveEffects.Distinct();
-                    if (ActiveEffects.Count() < 1)
+                    IEffectGetter[] ActiveEffectsA = ActiveEffects.ToArray();
+                    if (ActiveEffectsA.Length < 1)
                         continue;
                     String potionString = "<font face='$HandwrittenFont'><font size='26'>";
                     potionString += "-<b>" + (enumerator.Current.Name + "<br><b>-<b>" + ingr.Name + "</b>");
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
-                    foreach (IEffectGetter effect in ActiveEffects)
+                    foreach (IEffectGetter effect in ActiveEffectsA)
                     {
                         state.LinkCache.TryResolve<IMagicEffectGetter>(effect.BaseEffect.FormKey, out var mgeffect);
                         mgeflist.Add(mgeffect?.Name?.String);
@@ -126,7 +127,7 @@ namespace AddNewRecipes
                         continue;
                     }
                     List<IIngredientGetter> remainingingr2 = ingredients.Skip(j).ToList();
-                    IEnumerable<IIngredientGetter> potionList2 = getIngredientsMatchingTwoIngredients(enumerator.Current, enumerator2.Current, remainingingr2);
+                    IIngredientGetter[] potionList2 = getIngredientsMatchingTwoIngredients(enumerator.Current, enumerator2.Current, remainingingr2);
                     foreach (IIngredientGetter ingr in potionList2)
                     {
                         IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects);
@@ -135,7 +136,8 @@ namespace AddNewRecipes
                         ActiveEffects.ToList().AddRange(ActiveEffects2);
                         ActiveEffects.ToList().AddRange(ActiveEffects3);
                         ActiveEffects = ActiveEffects.Distinct();
-                        if (ActiveEffects.Count() < 1)
+                        IEffectGetter[] ActiveEffectsA = ActiveEffects.ToArray();
+                        if (ActiveEffectsA.Length < 1)
                             continue;
                         String potionString = "<font face='$HandwrittenFont'><font size='26'>";
                         potionString += "-<b>" + (enumerator.Current.Name + "<br></b>-<b>" + enumerator2.Current.Name + "<br></b>-<b>" + ingr.Name + "</b>");
@@ -209,7 +211,7 @@ namespace AddNewRecipes
             /* must split leveled lists because it can only hold 128 items */
             uint potionListCount = (potionCount / 128) + 1;
             LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionListCount];
-            uint masterpotionListCount = ((potionCount+poisonCount+impurepotionCount) / 128) / 128 + 1;
+            uint masterpotionListCount = (((potionCount + poisonCount + impurepotionCount) / 128 + 1) / 128) + 1;
             LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionListCount];
             LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionListCount];
             LeveledItemEntryData[] masterpotionRecipeLVLIentriesdata = new LeveledItemEntryData[masterpotionListCount];
@@ -217,7 +219,7 @@ namespace AddNewRecipes
             LeveledItemEntry[] potionRecipeLVLIentries = new LeveledItemEntry[potionListCount];
             LeveledItemEntryData[] potionRecipeLVLIentriesdata = new LeveledItemEntryData[potionListCount];
             GlobalInt[] potionGlobals = new GlobalInt[potionListCount];
-            for(int k = 0; k < masterpotionListCount; k++)
+            for (int k = 0; k < masterpotionListCount; k++)
             {
                 masterpotionRecipeLVLIentries[k] = new LeveledItemEntry();
                 masterpotionRecipeLVLIentriesdata[k] = new LeveledItemEntryData();
@@ -289,6 +291,8 @@ namespace AddNewRecipes
             }
             Console.WriteLine("Splitting potions into " + potionListCount + " " + poisonListCount + " " + impurepotionListCount);
             uint potionIndex = 0, poisonIndex = 0, impurepotionIndex = 0;
+            IEffectGetter[] effectCache = getAllEffects(ingredients).ToArray();
+            Dictionary<String, int> nameCache = new Dictionary<String, int>();
             foreach (IngrCombination ic in combinations)
             {
                 sw.Start();
@@ -303,11 +307,18 @@ namespace AddNewRecipes
                 foreach (String? s in ic.MyEffects!)
                     name += s;
                 name = name.Replace(" ", String.Empty);
-                int j = 0;
-                foreach (IBookGetter cbook in state.PatchMod.Books)
-                    while (cbook?.EditorID?.Contains((name + j.ToString())) ?? true)
-                        j++;
-                newRecipe.EditorID = name + j;
+                int nameIndex = 0;
+                if (nameCache.TryGetValue(name, out nameIndex))
+                {
+                    nameCache[name] = nameIndex + 1;
+                    name = name + nameCache[name];
+                }
+                else
+                {
+                    nameCache.Add(name, 0);
+                    name = name + "0";
+                }
+                newRecipe.EditorID = name;
                 state.PatchMod.Books.Set((Book)newRecipe);
                 LeveledItemEntry lie = new LeveledItemEntry();
                 LeveledItemEntryData data = new LeveledItemEntryData();
@@ -332,54 +343,56 @@ namespace AddNewRecipes
                         break;
                 }
                 i++;
-                if (i % percent == 0)
+                if (i % percent == 0 || i == combinations.Count())
                 {
                     sw.Stop();
                     Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
                     sw.Reset();
                 }
             }
-         
-                Console.WriteLine("Linking recipes to potion leveled lists");
-                IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
-                ILeveledItemGetter allList = lvlilists.ToList()[0];
-                LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
-                int startindex = 0;
-                int potionindex = 0, poisonindex = 0, impurepotionindex = 0;
-                for (int l = 0; l < masterpotionListCount; l++)
+
+            Console.WriteLine("Linking recipes to potion leveled lists");
+            IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
+            ILeveledItemGetter allList = lvlilists.ToList()[0];
+            LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
+            int startindex = 0;
+            potionIndex = 0;
+            poisonIndex = 0;
+            impurepotionIndex = 0;
+            for (int l = 0; l < masterpotionListCount; l++)
+            {
+                LeveledItem ml = masterpotionRecipeLVLIs[l];
+                while (startindex - l < 128)
                 {
-                    LeveledItem ml = masterpotionRecipeLVLIs[l];
-                    while (startindex - l < 128)
-                    {
-                        if (potionindex < potionRecipeLVLIentries.Count())
-                            ml.Entries?.Add(potionRecipeLVLIentries[potionIndex++]);
-                        else if (poisonindex < poisonRecipeLVLIentries.Count())
-                            ml.Entries?.Add(poisonRecipeLVLIentries[poisonIndex++]);
-                        else if (impurepotionindex < impurepotionRecipeLVLIentries.Count())
-                            ml.Entries?.Add(impurepotionRecipeLVLIentries[impurepotionIndex++]);
-                    }
-                    startindex += 128;
-                    state.PatchMod.LeveledItems.Set(ml);
-                    modifiedList.Entries?.Add(masterpotionRecipeLVLIentries[l]);
+                    if (potionIndex < potionRecipeLVLIentries.Count())
+                        ml.Entries?.Add(potionRecipeLVLIentries[potionIndex++]);
+                    else if (poisonIndex < poisonRecipeLVLIentries.Count())
+                        ml.Entries?.Add(poisonRecipeLVLIentries[poisonIndex++]);
+                    else if (impurepotionIndex < impurepotionRecipeLVLIentries.Count())
+                        ml.Entries?.Add(impurepotionRecipeLVLIentries[impurepotionIndex++]);
                 }
-                    foreach (LeveledItem li in potionRecipeLVLIs)
-                      state.PatchMod.LeveledItems.Set(li);
-                    foreach (LeveledItem li in poisonRecipeLVLIs)
-                        state.PatchMod.LeveledItems.Set(li);
-                    foreach (LeveledItem li in impurepotionRecipeLVLIs)
-                        state.PatchMod.LeveledItems.Set(li);
+                startindex += 128;
+                state.PatchMod.LeveledItems.Set(ml);
+                modifiedList.Entries?.Add(masterpotionRecipeLVLIentries[l]);
+            }
+            foreach (LeveledItem li in potionRecipeLVLIs)
+                state.PatchMod.LeveledItems.Set(li);
+            foreach (LeveledItem li in poisonRecipeLVLIs)
+                state.PatchMod.LeveledItems.Set(li);
+            foreach (LeveledItem li in impurepotionRecipeLVLIs)
+                state.PatchMod.LeveledItems.Set(li);
         }
-        private static IEnumerable<IIngredientGetter> getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
+        private static IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
             List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
-            return from matchingEffects in otherIngredients.ToList() where (firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) && (!firstIngredient.IngredientValue.Equals(matchingEffects.IngredientValue)) select matchingEffects;
+            return (from matchingEffects in otherIngredients.ToList() where (firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) && (!firstIngredient.IngredientValue.Equals(matchingEffects.IngredientValue)) select matchingEffects).ToArray();
 
         }
-        private static IEnumerable<IIngredientGetter> getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
+        private static IIngredientGetter[] getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
             List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
             List<IEffectGetter> secondIngredientEffects = secondIngredient.Effects.ToList();
-            return from matchingEffects in otherIngredients.ToList() where ((firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) || (secondIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any())) && (!firstIngredient.IngredientValue.Equals(matchingEffects.IngredientValue) && !secondIngredient.IngredientValue.Equals(matchingEffects.IngredientValue) && !firstIngredient.IngredientValue.Equals(secondIngredient.IngredientValue)) select matchingEffects;
+            return (from matchingEffects in otherIngredients.ToList() where ((firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) || (secondIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any())) && (!firstIngredient.IngredientValue.Equals(matchingEffects.IngredientValue) && !secondIngredient.IngredientValue.Equals(matchingEffects.IngredientValue) && !firstIngredient.IngredientValue.Equals(secondIngredient.IngredientValue)) select matchingEffects).ToArray();
         }
         private static IEnumerable<IEffectGetter> getAllEffects(IEnumerable<IIngredientGetter> ingrs)
         {
