@@ -205,8 +205,6 @@ namespace AddNewRecipes
             Console.WriteLine("Creating Leveled lists...");
             IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
             IBookGetter noteTemplate = books.ToList()[0];
-            IEnumerable<ILeveledItemGetter> lvlilists1 = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
-            ILeveledItemGetter allList1 = lvlilists1.ToList()[0];
             Console.WriteLine("Creating " + combinations.Count() + " recipes.");
             percent = (int)(combinations.Count() * outputPercentage);
             i = 0;
@@ -232,8 +230,8 @@ namespace AddNewRecipes
                 masterpotionGlobals[k] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
                 masterpotionGlobals[k].Data = new Random().Next(5, 25);
                 state.PatchMod.Globals.Set(masterpotionGlobals[k]);
-                masterpotionRecipeLVLIs[i].Global = masterpotionGlobals[k];
-                masterpotionRecipeLVLIs[i].EditorID = "masterpotionRecipeList" + k;
+                masterpotionRecipeLVLIs[k].Global = masterpotionGlobals[k];
+                masterpotionRecipeLVLIs[k].EditorID = "masterpotionRecipeList" + k;
                 masterpotionRecipeLVLIentriesdata[k].Reference = masterpotionRecipeLVLIs[k].FormKey;
                 masterpotionRecipeLVLIentriesdata[k].Level = 1;
                 masterpotionRecipeLVLIentriesdata[k].Count = 1;
