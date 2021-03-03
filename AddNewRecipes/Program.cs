@@ -18,7 +18,7 @@ namespace AddNewRecipes
         private static String[] SkipPlugins = { "bsassets", "bsheartland", "bs_dlc_patch", "bs_Campfire", "beyond skyrim", "bruma" }; //mods containing these names will be skipped(IF ADDING KEEP LOWERCASE)
         private static String[] SkipIngrs = { "Jarrin" }; //ingredients containing these words will be skipped
         private static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
-        private static double outputPercentage = 0.01; //How often to update output
+        private static double outputPercentage = 0.05; //How often to update output
         public static async Task<int> Main(string[] args)
         {
             return await SynthesisPipeline.Instance
@@ -212,8 +212,10 @@ namespace AddNewRecipes
             i = 0;
             /* must split leveled lists because it can only hold 128 items */
             uint potionRecipeListCount = (potionRecipeCount / 128) + 1;
+            uint poisonRecipeListCount = (poisonRecipeCount / 128) + 1;
+            uint impurepotionRecipeListCount = (impurepotionRecipeCount / 128) + 1;
             LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionRecipeListCount];
-            uint masterpotionRecipeListCount = (((potionRecipeCount + poisonRecipeCount + impurepotionRecipeCount) / 128 + 1) / 128) + 1;
+            uint masterpotionRecipeListCount = ((potionRecipeListCount+poisonRecipeListCount+impurepotionRecipeListCount) / 128) + 1;
             LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionRecipeListCount];
             LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionRecipeListCount];
             LeveledItemEntryData[] masterpotionRecipeLVLIentriesdata = new LeveledItemEntryData[masterpotionRecipeListCount];
@@ -251,7 +253,6 @@ namespace AddNewRecipes
                 potionRecipeLVLIentriesdata[l].Level = 1;
                 potionRecipeLVLIentriesdata[l].Count = 1;
             }
-            uint poisonRecipeListCount = (poisonRecipeCount / 128) + 1;
             LeveledItem[] poisonRecipeLVLIs = new LeveledItem[poisonRecipeListCount];
             LeveledItemEntry[] poisonRecipeLVLIentries = new LeveledItemEntry[poisonRecipeListCount];
             LeveledItemEntryData[] poisonRecipeLVLIentriesdata = new LeveledItemEntryData[poisonRecipeListCount];
@@ -271,7 +272,6 @@ namespace AddNewRecipes
                 poisonRecipeLVLIentriesdata[l].Level = 1;
                 poisonRecipeLVLIentriesdata[l].Count = 1;
             }
-            uint impurepotionRecipeListCount = (impurepotionRecipeCount / 128) + 1;
             LeveledItem[] impurepotionRecipeLVLIs = new LeveledItem[impurepotionRecipeListCount];
             LeveledItemEntry[] impurepotionRecipeLVLIentries = new LeveledItemEntry[impurepotionRecipeListCount];
             LeveledItemEntryData[] impurepotionRecipeLVLIentriesdata = new LeveledItemEntryData[impurepotionRecipeListCount];
