@@ -348,7 +348,6 @@ namespace AddNewRecipes
             IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
             ILeveledItemGetter allList = lvlilists.ToList()[0];
             LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
-            int startindex = 0;
             potionIndex = 0;
             poisonIndex = 0;
             impurepotionIndex = 0;
@@ -366,8 +365,12 @@ namespace AddNewRecipes
                     else
                         break;
                 }
-                state.PatchMod.LeveledItems.Set(ml);
+                masterpotionRecipeLVLIentriesdata[l].Level = 1;
+                masterpotionRecipeLVLIentriesdata[l].Count = 1;
+                masterpotionRecipeLVLIentriesdata[l].Reference = new FormLink<IItemGetter>(ml.FormKey);
+                masterpotionRecipeLVLIentries[l].Data = masterpotionRecipeLVLIentriesdata[l];
                 modifiedList.Entries?.Add(masterpotionRecipeLVLIentries[l]);
+                state.PatchMod.LeveledItems.Set(ml);
             }
             foreach (LeveledItem li in potionRecipeLVLIs)
                 state.PatchMod.LeveledItems.Set(li);
