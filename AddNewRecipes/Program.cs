@@ -11,12 +11,14 @@ namespace AddNewRecipes
 {
     public class Program
     {
-        private static String[] potionWords = { "Fortify", "Regenerate", "Resist", "Restore", "Waterbreathing", "Invisibility" };
-        private static String[] poisonWords = { "Damage", "Ravage", "Fear", "Slow", "Paralyze", "Weakness" };
+        private static String[] potionWordsA = { "Fortify", "Regenerate", "Resist", "Restore", "Waterbreathing", "Invisibility" };
+        private static String[] poisonWordsA = { "Damage", "Ravage", "Fear", "Slow", "Paralyze", "Weakness" };
+        private static HashSet<String> potionWords = new HashSet<String>(potionWordsA);
+        private static HashSet<String> poisonWords = new HashSet<String>(poisonWordsA);
         private static String[] SkipPlugins = { "bsassets", "bsheartland", "bs_dlc_patch", "bs_Campfire", "beyond skyrim", "bruma" }; //mods containing these names will be skipped(IF ADDING KEEP LOWERCASE)
         private static String[] SkipIngrs = { "Jarrin" }; //ingredients containing these words will be skipped
         private static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
-        private static double outputPercentage = 0.05; //How often to update output, every 5% by default
+        private static double outputPercentage = 0.01; //How often to update output
         public static async Task<int> Main(string[] args)
         {
             return await SynthesisPipeline.Instance
@@ -32,7 +34,7 @@ namespace AddNewRecipes
         }
         //public static readonly ModKey PatchRecipeesp = new ModKey("AddNewRecipes", ModType.Plugin);
         private static uint formkeyoffset = 0;
-        private static uint potionCount, poisonCount, impurepotionCount;
+        private static uint potionRecipeCount, poisonRecipeCount, impurepotionRecipeCount;
         private static Stopwatch sw = new Stopwatch();
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
         {
@@ -52,13 +54,13 @@ namespace AddNewRecipes
                     Console.WriteLine(i + " out of " + ingredients.Count() + " ingredients processed.");
                 }
                 List<IIngredientGetter> remainingingr = ingredients.Skip(i).ToList();
-                IIngredientGetter[] potionList = getIngredientsMatchingOneIngredient(enumerator.Current, remainingingr);
+                IIngredientGetter[] potionRecipeList = getIngredientsMatchingOneIngredient(enumerator.Current, remainingingr);
                 if (String.IsNullOrEmpty(enumerator.Current.Name?.String))
                 {
                     i++;
                     continue;
                 }
-                foreach (IIngredientGetter ingr in potionList)
+                foreach (IIngredientGetter ingr in potionRecipeList)
                 {
                     IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects).ToArray();
                     ActiveEffects = ActiveEffects.Distinct();
@@ -81,7 +83,7 @@ namespace AddNewRecipes
                     {
                         prefix = "Poison";
                         type = 1;
-                        poisonCount++;
+                        poisonRecipeCount++;
                     }
                     else if (mgeflists.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
                     {
@@ -89,11 +91,11 @@ namespace AddNewRecipes
                         type = 2;
                         if (mgeflists.Count() <= impureSkipThreshold)
                             continue;
-                        impurepotionCount++;
+                        impurepotionRecipeCount++;
                     }
                     else
                     {
-                        potionCount++;
+                        potionRecipeCount++;
                     }
                     potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of ");
                     String potionName = "Recipe: ";
@@ -127,8 +129,8 @@ namespace AddNewRecipes
                         continue;
                     }
                     List<IIngredientGetter> remainingingr2 = ingredients.Skip(j).ToList();
-                    IIngredientGetter[] potionList2 = getIngredientsMatchingTwoIngredients(enumerator.Current, enumerator2.Current, remainingingr2);
-                    foreach (IIngredientGetter ingr in potionList2)
+                    IIngredientGetter[] potionRecipeList2 = getIngredientsMatchingTwoIngredients(enumerator.Current, enumerator2.Current, remainingingr2);
+                    foreach (IIngredientGetter ingr in potionRecipeList2)
                     {
                         IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects);
                         IEnumerable<IEffectGetter> ActiveEffects2 = ingr.Effects.Intersect(enumerator2.Current.Effects);
@@ -155,7 +157,7 @@ namespace AddNewRecipes
                         {
                             prefix = "Poison";
                             type = 1;
-                            poisonCount++;
+                            poisonRecipeCount++;
                         }
                         else if (mgeflists.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
                         {
@@ -163,11 +165,11 @@ namespace AddNewRecipes
                             type = 2;
                             if (mgeflists.Count() <= impureSkipThreshold)
                                 continue;
-                            impurepotionCount++;
+                            impurepotionRecipeCount++;
                         }
                         else
                         {
-                            potionCount++;
+                            potionRecipeCount++;
                         }
                         potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>");
                         String potionName = "Recipe: ";
@@ -209,17 +211,17 @@ namespace AddNewRecipes
             percent = (int)(combinations.Count() * outputPercentage);
             i = 0;
             /* must split leveled lists because it can only hold 128 items */
-            uint potionListCount = (potionCount / 128) + 1;
-            LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionListCount];
-            uint masterpotionListCount = (((potionCount + poisonCount + impurepotionCount) / 128 + 1) / 128) + 1;
-            LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionListCount];
-            LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionListCount];
-            LeveledItemEntryData[] masterpotionRecipeLVLIentriesdata = new LeveledItemEntryData[masterpotionListCount];
-            GlobalInt[] masterpotionGlobals = new GlobalInt[masterpotionListCount];
-            LeveledItemEntry[] potionRecipeLVLIentries = new LeveledItemEntry[potionListCount];
-            LeveledItemEntryData[] potionRecipeLVLIentriesdata = new LeveledItemEntryData[potionListCount];
-            GlobalInt[] potionGlobals = new GlobalInt[potionListCount];
-            for (int k = 0; k < masterpotionListCount; k++)
+            uint potionRecipeListCount = (potionRecipeCount / 128) + 1;
+            LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionRecipeListCount];
+            uint masterpotionRecipeListCount = (((potionRecipeCount + poisonRecipeCount + impurepotionRecipeCount) / 128 + 1) / 128) + 1;
+            LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionRecipeListCount];
+            LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionRecipeListCount];
+            LeveledItemEntryData[] masterpotionRecipeLVLIentriesdata = new LeveledItemEntryData[masterpotionRecipeListCount];
+            GlobalInt[] masterpotionGlobals = new GlobalInt[masterpotionRecipeListCount];
+            LeveledItemEntry[] potionRecipeLVLIentries = new LeveledItemEntry[potionRecipeListCount];
+            LeveledItemEntryData[] potionRecipeLVLIentriesdata = new LeveledItemEntryData[potionRecipeListCount];
+            GlobalInt[] potionGlobals = new GlobalInt[potionRecipeListCount];
+            for (int k = 0; k < masterpotionRecipeListCount; k++)
             {
                 masterpotionRecipeLVLIentries[k] = new LeveledItemEntry();
                 masterpotionRecipeLVLIentriesdata[k] = new LeveledItemEntryData();
@@ -234,7 +236,7 @@ namespace AddNewRecipes
                 masterpotionRecipeLVLIentriesdata[k].Level = 1;
                 masterpotionRecipeLVLIentriesdata[k].Count = 1;
             }
-            for (int l = 0; l < potionListCount; l++)
+            for (int l = 0; l < potionRecipeListCount; l++)
             {
                 potionRecipeLVLIentries[l] = new LeveledItemEntry();
                 potionRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
@@ -249,12 +251,12 @@ namespace AddNewRecipes
                 potionRecipeLVLIentriesdata[l].Level = 1;
                 potionRecipeLVLIentriesdata[l].Count = 1;
             }
-            uint poisonListCount = (poisonCount / 128) + 1;
-            LeveledItem[] poisonRecipeLVLIs = new LeveledItem[poisonListCount];
-            LeveledItemEntry[] poisonRecipeLVLIentries = new LeveledItemEntry[poisonListCount];
-            LeveledItemEntryData[] poisonRecipeLVLIentriesdata = new LeveledItemEntryData[poisonListCount];
-            GlobalInt[] poisonGlobals = new GlobalInt[poisonListCount];
-            for (int l = 0; l < poisonListCount; l++)
+            uint poisonRecipeListCount = (poisonRecipeCount / 128) + 1;
+            LeveledItem[] poisonRecipeLVLIs = new LeveledItem[poisonRecipeListCount];
+            LeveledItemEntry[] poisonRecipeLVLIentries = new LeveledItemEntry[poisonRecipeListCount];
+            LeveledItemEntryData[] poisonRecipeLVLIentriesdata = new LeveledItemEntryData[poisonRecipeListCount];
+            GlobalInt[] poisonGlobals = new GlobalInt[poisonRecipeListCount];
+            for (int l = 0; l < poisonRecipeListCount; l++)
             {
                 poisonRecipeLVLIentries[l] = new LeveledItemEntry();
                 poisonRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
@@ -269,12 +271,12 @@ namespace AddNewRecipes
                 poisonRecipeLVLIentriesdata[l].Level = 1;
                 poisonRecipeLVLIentriesdata[l].Count = 1;
             }
-            uint impurepotionListCount = (impurepotionCount / 128) + 1;
-            LeveledItem[] impurepotionRecipeLVLIs = new LeveledItem[impurepotionListCount];
-            LeveledItemEntry[] impurepotionRecipeLVLIentries = new LeveledItemEntry[impurepotionListCount];
-            LeveledItemEntryData[] impurepotionRecipeLVLIentriesdata = new LeveledItemEntryData[impurepotionListCount];
-            GlobalInt[] impurepotionGlobals = new GlobalInt[impurepotionListCount];
-            for (int l = 0; l < impurepotionListCount; l++)
+            uint impurepotionRecipeListCount = (impurepotionRecipeCount / 128) + 1;
+            LeveledItem[] impurepotionRecipeLVLIs = new LeveledItem[impurepotionRecipeListCount];
+            LeveledItemEntry[] impurepotionRecipeLVLIentries = new LeveledItemEntry[impurepotionRecipeListCount];
+            LeveledItemEntryData[] impurepotionRecipeLVLIentriesdata = new LeveledItemEntryData[impurepotionRecipeListCount];
+            GlobalInt[] impurepotionGlobals = new GlobalInt[impurepotionRecipeListCount];
+            for (int l = 0; l < impurepotionRecipeListCount; l++)
             {
                 impurepotionRecipeLVLIentries[l] = new LeveledItemEntry();
                 impurepotionRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
@@ -289,7 +291,7 @@ namespace AddNewRecipes
                 impurepotionRecipeLVLIentriesdata[l].Level = 1;
                 impurepotionRecipeLVLIentriesdata[l].Count = 1;
             }
-            Console.WriteLine("Splitting potions into " + potionListCount + " " + poisonListCount + " " + impurepotionListCount);
+            Console.WriteLine("Splitting potions into " + potionRecipeListCount + " " + poisonRecipeListCount + " " + impurepotionRecipeListCount);
             uint potionIndex = 0, poisonIndex = 0, impurepotionIndex = 0;
             IEffectGetter[] effectCache = getAllEffects(ingredients).ToArray();
             Dictionary<String, int> nameCache = new Dictionary<String, int>();
@@ -359,8 +361,9 @@ namespace AddNewRecipes
             potionIndex = 0;
             poisonIndex = 0;
             impurepotionIndex = 0;
-            for (int l = 0; l < masterpotionListCount; l++)
+            for (int l = 0; l < masterpotionRecipeListCount; l++)
             {
+                sw.Start();
                 LeveledItem ml = masterpotionRecipeLVLIs[l];
                 while (startindex - l < 128)
                 {
@@ -370,10 +373,18 @@ namespace AddNewRecipes
                         ml.Entries?.Add(poisonRecipeLVLIentries[poisonIndex++]);
                     else if (impurepotionIndex < impurepotionRecipeLVLIentries.Count())
                         ml.Entries?.Add(impurepotionRecipeLVLIentries[impurepotionIndex++]);
+                    else
+                        break;
                 }
                 startindex += 128;
                 state.PatchMod.LeveledItems.Set(ml);
                 modifiedList.Entries?.Add(masterpotionRecipeLVLIentries[l]);
+                if (l % percent == 0)
+                {
+                    sw.Stop();
+                    Console.WriteLine("time elapsed:  " + sw.Elapsed.TotalSeconds + " seconds");
+                    sw.Reset();
+                }
             }
             foreach (LeveledItem li in potionRecipeLVLIs)
                 state.PatchMod.LeveledItems.Set(li);
