@@ -18,6 +18,8 @@ namespace AddNewRecipes
         private static String[] SkipPlugins = { "bsassets", "bsheartland", "bs_dlc_patch", "bs_Campfire", "beyond skyrim", "bruma" }; //mods containing these names will be skipped(IF ADDING KEEP LOWERCASE)
         private static String[] SkipIngrs = { "Jarrin" }; //ingredients containing these words will be skipped
         private static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
+        private static int potionSkipThreshold = 2; // potions with this or less number of effects will be skipped
+        private static int poisonSkipThreshold = 1; // potions with this or less number of effects will be skipped
         private static double outputPercentage = 0.05; //How often to update output
         public static async Task<int> Main(string[] args)
         {
@@ -83,6 +85,8 @@ namespace AddNewRecipes
                     {
                         prefix = "Poison";
                         type = 1;
+                        if (mgeflists.Count() <= poisonSkipThreshold)
+                            continue;
                         poisonRecipeCount++;
                     }
                     else if (mgeflists.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
@@ -95,6 +99,8 @@ namespace AddNewRecipes
                     }
                     else
                     {
+                        if (mgeflists.Count() <= potionSkipThreshold)
+                            continue;
                         potionRecipeCount++;
                     }
                     potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of ");
@@ -157,6 +163,8 @@ namespace AddNewRecipes
                         {
                             prefix = "Poison";
                             type = 1;
+                            if (mgeflists.Count() <= poisonSkipThreshold)
+                                continue;
                             poisonRecipeCount++;
                         }
                         else if (mgeflists.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
@@ -169,6 +177,8 @@ namespace AddNewRecipes
                         }
                         else
                         {
+                            if (mgeflists.Count() <= potionSkipThreshold)
+                                continue;
                             potionRecipeCount++;
                         }
                         potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>");
