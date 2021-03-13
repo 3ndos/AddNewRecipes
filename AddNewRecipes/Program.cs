@@ -20,6 +20,7 @@ namespace AddNewRecipes
         private static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
         private static int potionSkipThreshold = 1; // potions with this or less number of effects will be skipped
         private static int poisonSkipThreshold = 1; // potions with this or less number of effects will be skipped
+        private static float recipeWeight = 0f;
         private static int minChance = 5;//min chance(5%) of receiving a recipe
         private static int maxChance = 25;//max chance(25%) of receiving a recipe
         private static double outputPercentage = 0.05; //How often to update output
@@ -323,6 +324,7 @@ namespace AddNewRecipes
                 newRecipe.Description = ic.RecipeName;
                 newRecipe.Name = ic.RecipeName;
                 newRecipe.BookText = ic.PotionString;
+                newRecipe.Weight = recipeWeight;
                 String? name = "recipeof";
                 foreach (String? s in ic.MyEffects!)
                     name += s;
