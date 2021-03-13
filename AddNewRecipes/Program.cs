@@ -406,6 +406,8 @@ namespace AddNewRecipes
 
             mainpotionRecipeLVLIentrydata.Reference = mainpotionRecipeLVLI.FormKey;
             mainpotionRecipeLVLIentry.Data = mainpotionRecipeLVLIentrydata;
+            mainpotionRecipeLVLIentrydata.Count = 1;
+            mainpotionRecipeLVLIentrydata.Level = 1;
             modifiedList.Entries?.Add(mainpotionRecipeLVLIentry);
             state.PatchMod.LeveledItems.Set(mainpotionRecipeLVLI);
         }
