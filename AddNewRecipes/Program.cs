@@ -89,7 +89,7 @@ namespace AddNewRecipes
                     {
                         prefix = "Poison";
                         type = 1;
-                        if (mgeflists.Count() <= poisonSkipThreshold)
+                        if (mgeflist.Count() <= poisonSkipThreshold)
                             continue;
                         poisonRecipeCount++;
                     }
@@ -97,13 +97,13 @@ namespace AddNewRecipes
                     {
                         prefix = "Impure Potion";
                         type = 2;
-                        if (mgeflists.Count() <= impureSkipThreshold)
+                        if (mgeflist.Count() <= impureSkipThreshold)
                             continue;
                         impurepotionRecipeCount++;
                     }
                     else
                     {
-                        if (mgeflists.Count() <= potionSkipThreshold)
+                        if (mgeflist.Count() <= potionSkipThreshold)
                             continue;
                         potionRecipeCount++;
                     }
@@ -167,11 +167,11 @@ namespace AddNewRecipes
                         {
                             prefix = "Poison";
                             type = 1;
-                            if (mgeflists.Count() <= poisonSkipThreshold)
+                            if (mgeflist.Count() <= poisonSkipThreshold)
                                 continue;
                             poisonRecipeCount++;
                         }
-                        else if (mgeflists.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
+                        else if (mgeflist.Intersect(potionWords.ToList()).Any() && mgeflists.Intersect(poisonWords.ToList()).Any())
                         {
                             prefix = "Impure Potion";
                             type = 2;
@@ -181,7 +181,7 @@ namespace AddNewRecipes
                         }
                         else
                         {
-                            if (mgeflists.Count() <= potionSkipThreshold)
+                            if (mgeflist.Count() <= potionSkipThreshold)
                                 continue;
                             potionRecipeCount++;
                         }
