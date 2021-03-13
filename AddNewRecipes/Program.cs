@@ -23,6 +23,8 @@ namespace AddNewRecipes
         private static float recipeWeight = 0f;
         private static int minChance = 5;//min chance(5%) of receiving a recipe
         private static int maxChance = 25;//max chance(25%) of receiving a recipe
+        private static String[] containerEditorIDsA = { "TreasBanditChest", "TreasDraugrChest" }; //add containers to add the potential loot of recipe
+        private static HashSet<String> containerEditorIDs = new HashSet<String>(containerEditorIDsA);
         private static double outputPercentage = 0.05; //How often to update output
         public static async Task<int> Main(string[] args)
         {
@@ -373,7 +375,7 @@ namespace AddNewRecipes
                 i++;
             }
 
-            Console.WriteLine("Linking recipes to potion leveled lists");
+            Console.WriteLine("Linking recipes to potion leveled list");
             IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
             ILeveledItemGetter allList = lvlilists.ToList()[0];
             LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
@@ -412,6 +414,18 @@ namespace AddNewRecipes
             mainpotionRecipeLVLIentrydata.Level = 1;
             modifiedList.Entries?.Add(mainpotionRecipeLVLIentry);
             state.PatchMod.LeveledItems.Set(mainpotionRecipeLVLI);
+            Console.WriteLine("Adding recipes to defined containers");
+            IEnumerable<IContainerGetter> chests = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().Container().WinningOverrides() where containerEditorIDs?.ToList().Contains(list.EditorID!) ?? true select list;
+            ContainerEntry potionListContainerEntry = new ContainerEntry();
+            ContainerItem potionListContainerItem = new ContainerItem();
+            potionListContainerItem.Item = mainpotionRecipeLVLI.FormKey;
+            potionListContainerItem.Count = 1;
+            potionListContainerEntry.Item = potionListContainerItem;
+            foreach(IContainerGetter chest in chests)
+            {
+                Container rChest = state.PatchMod.Containers.GetOrAddAsOverride(chest);
+                rChest.Items?.Add(potionListContainerEntry);
+            }
         }
         private static IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
