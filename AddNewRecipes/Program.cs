@@ -68,16 +68,16 @@ namespace AddNewRecipes
                 }
                 foreach (IIngredientGetter ingr in potionRecipeList)
                 {
-                    IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(ingr.Effects).ToArray();
-                    ActiveEffects = ActiveEffects.Distinct();
-                    IEffectGetter[] ActiveEffectsA = ActiveEffects.ToArray();
-                    if (ActiveEffectsA.Length < 1)
+                    var activeEffects = ingr.Effects
+                        .Distinct()
+                        .ToArray();
+                    if (activeEffects.Length < 1)
                         continue;
                     String potionString = "<font face='$HandwrittenFont'><font size='26'>";
                     potionString += "-<b>" + (target.Name + "<br><b>-<b>" + ingr.Name + "</b>");
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
-                    foreach (IEffectGetter effect in ActiveEffectsA)
+                    foreach (IEffectGetter effect in activeEffects)
                     {
                         state.LinkCache.TryResolve<IMagicEffectGetter>(effect.BaseEffect.FormKey, out var mgeffect);
                         mgeflist.Add(mgeffect?.Name?.String);
