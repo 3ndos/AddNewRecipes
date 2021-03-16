@@ -89,7 +89,7 @@ namespace AddNewRecipes
                     {
                         prefix = "Poison";
                         type = 1;
-                        if (mgeflist.Count() <= poisonSkipThreshold)
+                        if (mgeflist.Count <= poisonSkipThreshold)
                             continue;
                         poisonRecipeCount++;
                     }
@@ -97,19 +97,19 @@ namespace AddNewRecipes
                     {
                         prefix = "Impure Potion";
                         type = 2;
-                        if (mgeflist.Count() <= impureSkipThreshold)
+                        if (mgeflist.Count <= impureSkipThreshold)
                             continue;
                         impurepotionRecipeCount++;
                     }
                     else
                     {
-                        if (mgeflist.Count() <= potionSkipThreshold)
+                        if (mgeflist.Count <= potionSkipThreshold)
                             continue;
                         potionRecipeCount++;
                     }
                     potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of ");
                     String potionName = "Recipe: ";
-                    for (int k = 0; k < mgeflist.Count(); k++)
+                    for (int k = 0; k < mgeflist.Count; k++)
                     {
                         if (k > 0)
                         {
@@ -121,10 +121,10 @@ namespace AddNewRecipes
                     }
                     String sstring = "";
 
-                    if (mgeflist.Count() > 1)
+                    if (mgeflist.Count > 1)
                         sstring = "s";
 
-                    potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count() + " Effect" + sstring);
+                    potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring);
                     potionString += "<\\font>";
                     IIngredientGetter[] ingrss = { target, ingr };
                     combinations.Add(new IngrCombination(potionName, ingrss, mgeflist?.ToArray()!, potionString, type));
@@ -166,7 +166,7 @@ namespace AddNewRecipes
                         {
                             prefix = "Poison";
                             type = 1;
-                            if (mgeflist.Count() <= poisonSkipThreshold)
+                            if (mgeflist.Count <= poisonSkipThreshold)
                                 continue;
                             poisonRecipeCount++;
                         }
@@ -174,19 +174,19 @@ namespace AddNewRecipes
                         {
                             prefix = "Impure Potion";
                             type = 2;
-                            if (mgeflists.Count() <= impureSkipThreshold)
+                            if (mgeflists.Count <= impureSkipThreshold)
                                 continue;
                             impurepotionRecipeCount++;
                         }
                         else
                         {
-                            if (mgeflist.Count() <= potionSkipThreshold)
+                            if (mgeflist.Count <= potionSkipThreshold)
                                 continue;
                             potionRecipeCount++;
                         }
                         potionString += ("</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>");
                         String potionName = "Recipe: ";
-                        for (int k = 0; k < mgeflist.Count(); k++)
+                        for (int k = 0; k < mgeflist.Count; k++)
                         {
                             if (k > 0)
                             {
@@ -198,9 +198,9 @@ namespace AddNewRecipes
                         }
                         String sstring = "";
 
-                        if (mgeflist.Count() > 1)
+                        if (mgeflist.Count > 1)
                             sstring = "s";
-                        potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count() + " Effect" + sstring);
+                        potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring);
                         potionString += "<\\font>";
                         IIngredientGetter[] ingrss = { target, remainingIngr, ingr };
                         combinations.Add(new IngrCombination(potionName, ingrss, mgeflist?.ToArray()!, potionString, type));
@@ -218,8 +218,8 @@ namespace AddNewRecipes
             Console.WriteLine("Creating Leveled lists...");
             IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
             IBookGetter noteTemplate = books.ToList()[0];
-            Console.WriteLine("Creating " + combinations.Count() + " recipes.");
-            percent = (int)(combinations.Count() * outputPercentage);
+            Console.WriteLine("Creating " + combinations.Count + " recipes.");
+            percent = (int)(combinations.Count * outputPercentage);
             i = 0;
             /* Main leveled list that gets added to recipe drop */
             LeveledItem mainpotionRecipeLVLI = state.PatchMod.LeveledItems.AddNew();
@@ -319,7 +319,7 @@ namespace AddNewRecipes
             foreach (IngrCombination ic in combinations)
             {
                 if (i % percent == 0)
-                    Console.WriteLine(i + " out of " + combinations.Count() + " recipes created.");
+                    Console.WriteLine(i + " out of " + combinations.Count + " recipes created.");
                 IBook newRecipe = noteTemplate.DeepCopy();
                 newRecipe.FormKey = state.PatchMod.GetNextFormKey();
                 newRecipe.Description = ic.RecipeName;
@@ -387,11 +387,11 @@ namespace AddNewRecipes
                 masterpotionRecipeLVLIentries[l].Data = masterpotionRecipeLVLIentriesdata[l];
                 for (int k = 0; k < 128; k++)
                 {
-                    if (potionIndex < potionRecipeLVLIentries.Count())
+                    if (potionIndex < potionRecipeLVLIentries.Length)
                         masterpotionRecipeLVLIs[l].Entries?.Add(potionRecipeLVLIentries[potionIndex++]);
-                    else if (poisonIndex < poisonRecipeLVLIentries.Count())
+                    else if (poisonIndex < poisonRecipeLVLIentries.Length)
                         masterpotionRecipeLVLIs[l].Entries?.Add(poisonRecipeLVLIentries[poisonIndex++]);
-                    else if (impurepotionIndex < impurepotionRecipeLVLIentries.Count())
+                    else if (impurepotionIndex < impurepotionRecipeLVLIentries.Length)
                         masterpotionRecipeLVLIs[l].Entries?.Add(impurepotionRecipeLVLIentries[impurepotionIndex++]);
                     else
                         break;
