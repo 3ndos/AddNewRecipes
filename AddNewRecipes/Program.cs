@@ -1,4 +1,5 @@
 using Mutagen.Bethesda;
+using Mutagen.Bethesda.FormKeys.SkyrimSE;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 using System;
@@ -216,8 +217,8 @@ namespace AddNewRecipes
                 }
             }
             Console.WriteLine("Creating Leveled lists...");
-            IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
-            IBookGetter noteTemplate = books.First();
+            
+            IBookGetter noteTemplate = state.LinkCache.Resolve<IBookGetter>(Constants.Skyrim.MakeFormKey(0x0F5CB1));
             Console.WriteLine("Creating " + combinations.Count + " recipes.");
             percent = (int)(combinations.Count * outputPercentage);
             i = 0;
@@ -375,8 +376,7 @@ namespace AddNewRecipes
             }
 
             Console.WriteLine("Linking recipes to potion leveled list");
-            IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") ?? true select list;
-            ILeveledItemGetter allList = lvlilists.ToList()[0];
+            ILeveledItemGetter allList = state.LinkCache.Resolve<ILeveledItemGetter>(Skyrim.LeveledItem.LItemPotionAll);
             LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
             potionIndex = 0;
             poisonIndex = 0;
@@ -414,7 +414,11 @@ namespace AddNewRecipes
             modifiedList.Entries?.Add(mainpotionRecipeLVLIentry);
             state.PatchMod.LeveledItems.Set(mainpotionRecipeLVLI);
             Console.WriteLine("Adding recipes to defined containers");
-            IEnumerable<IContainerGetter> chests = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().Container().WinningOverrides() where containerEditorIDs?.ToList().Contains(list.EditorID!) ?? true select list;
+            List<IContainerGetter> chests = new List<IContainerGetter>()
+            {
+                state.LinkCache.Resolve<IContainerGetter>(Skyrim.Container.TreasBanditChest),
+                state.LinkCache.Resolve<IContainerGetter>(Skyrim.Container.TreasDraugrChest),
+            };
             ContainerEntry potionListContainerEntry = new ContainerEntry();
             ContainerItem potionListContainerItem = new ContainerItem();
             potionListContainerItem.Item = mainpotionRecipeLVLI.FormKey;
