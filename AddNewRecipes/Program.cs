@@ -14,10 +14,8 @@ namespace AddNewRecipes
 {
     public class Program
     {
-        private static String[] potionWordsA = { "Fortify", "Regenerate", "Resist", "Restore", "Waterbreathing", "Invisibility" };
+        private static String[] potionWordsA = { "Fortify", "Regenerate", "Resist", "Restore", "Waterbreathing", "Invisibility", "Speed" };
         private static String[] poisonWordsA = { "Damage", "Ravage", "Fear", "Slow", "Paralyze", "Weakness" };
-        public static HashSet<String> potionWords = new HashSet<String>(potionWordsA);
-        public static HashSet<String> poisonWords = new HashSet<String>(poisonWordsA);
         private static String[] SkipPlugins = { "bsassets", "bsheartland", "bs_dlc_patch", "bs_Campfire", "beyond skyrim", "bruma" }; //mods containing these names will be skipped(IF ADDING KEEP LOWERCASE)
         private static String[] SkipIngrs = { "Jarrin" }; //ingredients containing these words will be skipped
         public static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
@@ -25,12 +23,17 @@ namespace AddNewRecipes
         public static int poisonSkipThreshold = 1; // potions with this or less number of effects will be skipped
         private static float recipeWeight = 0f;//how much will the recipes weigh
         private static uint recipeValue = 250;//how much will the recipes be worth
+        private static bool learnEffectsFromRecipe = true;//only takes effect if Complete Alchemy and Cooking Overhaul is installed, recommended to also install the included patch for CACO
         private static int minChance = 5;//min chance(5%) of receiving a recipe
         private static int maxChance = 25;//max chance(25%) of receiving a recipe
         private static String[] containerEditorIDsA = { "TreasBanditChest", "TreasDraugrChest" }; //add containers to add the potential loot of recipe
-        private static HashSet<String> containerEditorIDs = new HashSet<String>(containerEditorIDsA);
         public static double outputPercentage = 0.05; //How often to update output
         private static int workerThreadCount = 4;//How many threads for to process ingredients list, if you're running out of memory lower this number(will be slower but less resource intensive)
+
+
+        public static HashSet<String> potionWords = new HashSet<String>(potionWordsA);
+        public static HashSet<String> poisonWords = new HashSet<String>(poisonWordsA);
+        private static HashSet<String> containerEditorIDs = new HashSet<String>(containerEditorIDsA);
         public static async Task<int> Main(string[] args)
         {
             return await SynthesisPipeline.Instance
@@ -228,7 +231,7 @@ namespace AddNewRecipes
                 }
                 newRecipe.EditorID = name;
                 /* Add ingredients to CACO learning recipe script */
-                if (state.LoadOrder.ContainsKey(ModKey.FromNameAndExtension("Complete Alchemy & Cooking Overhaul.esp")))
+                if (state.LoadOrder.ContainsKey(ModKey.FromNameAndExtension("Complete Alchemy & Cooking Overhaul.esp")) && learnEffectsFromRecipe)
                 {
                     String[] s = (from scriptentry in newRecipe.VirtualMachineAdapter?.Scripts where scriptentry.Name.Equals("CACO_AlchemyRecipeScript") select scriptentry.Name).ToArray();
                     if (s.Length < 1)//For adding recipe to a brand new item (not a copy of a vanilla recipe)
@@ -250,21 +253,24 @@ namespace AddNewRecipes
                                 for (int j = 0; j < ingrEffectIndex.GetLength(0); j++)
                                     for (int k = 0; k < ingrEffectIndex.GetLength(1); k++)
                                         ingrEffectIndex[j, k] = -1;
-                                foreach (String mgefname in ic.MyEffects)
+                                for (int j = 0; j < ic.MyIngrs.Length; j++)
                                 {
-                                    for (int j = 0; j < ic.MyIngrs.Length; j++)
+                                    int offset = 0;
+                                    for (int k = 0; k < ic.MyIngrs[j].Effects.Count; k++)
                                     {
-                                        for (int k = 0; k < ic.MyIngrs[j].Effects.Count; k++)
+                                        foreach (String mgefname in ic.MyEffects)
                                         {
-                                            int offset = 0;
+
                                             state.LinkCache.TryResolve<IMagicEffectGetter>(ic.MyIngrs[j].Effects[k].BaseEffect.FormKey, out var mgeffect);
+                                            Console.WriteLine(mgefname + " compared to " + mgeffect?.Name?.String + " on " + ic.MyIngrs[j].Name?.String);
                                             if (mgeffect?.Name?.String?.Equals(mgefname) ?? true)
                                             {
-                                                ingrEffectIndex[j, offset] = k;
-                                                offset++;
+                                                Console.WriteLine("ingredient " + ic.MyIngrs[j].Name + " " + offset + " " + k);
+                                                ingrEffectIndex[j, offset++] = k;
                                             }
                                         }
                                     }
+
                                 }
                                 bool[,] exists = new bool[3, 4];
                                 bool[] rexists = new bool[3];
@@ -307,15 +313,15 @@ namespace AddNewRecipes
                                 for (int j = 0; j < exists.GetLength(0); j++)
                                     for (int k = 0; k < exists.GetLength(1); k++)
                                     {
-                                        if (ic.MyIngrs.Length > j)
-                                            if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
-                                            {
-                                                ScriptIntProperty sip = new ScriptIntProperty();
-                                                sip.Data = ingrEffectIndex[j, k];
-                                                sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
-                                                sip.Flags = ScriptProperty.Flag.Edited;
-                                                se.Properties.Add(sip);
-                                            }
+                                        //if (ic.MyIngrs.Length > j)
+                                        if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
+                                        {
+                                            ScriptIntProperty sip = new ScriptIntProperty();
+                                            sip.Data = ingrEffectIndex[j, k];
+                                            sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
+                                            sip.Flags = ScriptProperty.Flag.Edited;
+                                            se.Properties.Add(sip);
+                                        }
                                     }
                                 if (!trexist)
                                 {
@@ -480,6 +486,7 @@ namespace AddNewRecipes
                         continue;
                     String potionString = "<font face='$HandwrittenFont'><font size='26'>";//Define main text for recipe
                     potionString += "-<b>" + (ingredient.Name + "<br><b>-<b>" + ingr.Name + "</b>");
+
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
                     for (int n = 0; n < ActiveEffectsA.Length; n++)
@@ -519,7 +526,7 @@ namespace AddNewRecipes
                         Program.potionRecipeCount++;
                         Program.ourMutex.ReleaseMutex();
                     }
-                    potionString += "</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of ";
+                    potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
                     String potionName = "Recipe: ";//Define recipe name
                     for (int k = 0; k < mgeflist.Count; k++)
                     {
@@ -607,7 +614,7 @@ namespace AddNewRecipes
                             Program.potionRecipeCount++;
                             Program.ourMutex.ReleaseMutex();
                         }
-                        potionString += "</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
+                        potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
                         String potionName = "Recipe: ";
                         for (int k = 0; k < mgeflist.Count; k++)
                         {
