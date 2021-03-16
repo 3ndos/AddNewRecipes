@@ -217,7 +217,7 @@ namespace AddNewRecipes
             }
             Console.WriteLine("Creating Leveled lists...");
             IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
-            IBookGetter noteTemplate = books.ToList()[0];
+            IBookGetter noteTemplate = books.First();
             Console.WriteLine("Creating " + combinations.Count + " recipes.");
             percent = (int)(combinations.Count * outputPercentage);
             i = 0;
