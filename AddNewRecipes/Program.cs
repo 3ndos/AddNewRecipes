@@ -59,7 +59,7 @@ namespace AddNewRecipes
                 {
                     Console.WriteLine(i + " out of " + ingredients.Count + " ingredients processed.");
                 }
-                List<IIngredientGetter> remainingingr = ingredients.Skip(i).ToList();
+                List<IIngredientGetter> remainingingr = ingredients.GetRange(i, ingredients.Count - i);
                 IIngredientGetter[] potionRecipeList = getIngredientsMatchingOneIngredient(target, remainingingr);
                 if (String.IsNullOrEmpty(target.Name?.String))
                 {
@@ -137,7 +137,7 @@ namespace AddNewRecipes
                         j++;
                         continue;
                     }
-                    List<IIngredientGetter> remainingingr2 = ingredients.Skip(j).ToList();
+                    List<IIngredientGetter> remainingingr2 = ingredients.GetRange(j, ingredients.Count - j);
                     IIngredientGetter[] potionRecipeList2 = getIngredientsMatchingTwoIngredients(target, remainingIngr, remainingingr2);
                     foreach (IIngredientGetter ingr in potionRecipeList2)
                     {
