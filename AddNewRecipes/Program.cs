@@ -45,36 +45,36 @@ namespace AddNewRecipes
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
         {
             List<IngrCombination> combinations = new List<IngrCombination>();
-            IEnumerable<IIngredientGetter> ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides();
-            ingredients = from ingrs in ingredients where !SkipPlugins.Contains(ingrs.FormKey.ModKey.Name.ToLower()) select ingrs;
-            ingredients = from ingrs in ingredients where (!SkipIngrs.Intersect(ingrs.Name?.ToString()?.Split()!).Any() || SkipIngrs.Contains(ingrs.Name?.ToString())) select ingrs;
-            ingredients = from ingrs in ingredients where !String.IsNullOrEmpty(ingrs.Name?.String) select ingrs;
-            IEnumerator<IIngredientGetter> enumerator = ingredients.GetEnumerator();
+            var ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides()
+                .Where(x => !SkipPlugins.Contains(x.FormKey.ModKey.Name.ToLower()))
+                .Where(x => (!SkipIngrs.Intersect(x.Name?.ToString()?.Split()!).Any() || SkipIngrs.Contains(x.Name?.ToString())))
+                .Where(x => !String.IsNullOrEmpty(x.Name?.String))
+                .ToList();
             int i = 0;
-            int percent = (int)(ingredients.Count() * outputPercentage);
-            while (enumerator.MoveNext())
+            int percent = (int)(ingredients.Count * outputPercentage);
+            foreach (var target in ingredients)
             {
                 sw.Start();
                 if (i % percent == 0)
                 {
-                    Console.WriteLine(i + " out of " + ingredients.Count() + " ingredients processed.");
+                    Console.WriteLine(i + " out of " + ingredients.Count + " ingredients processed.");
                 }
                 List<IIngredientGetter> remainingingr = ingredients.Skip(i).ToList();
-                IIngredientGetter[] potionRecipeList = getIngredientsMatchingOneIngredient(enumerator.Current, remainingingr);
-                if (String.IsNullOrEmpty(enumerator.Current.Name?.String))
+                IIngredientGetter[] potionRecipeList = getIngredientsMatchingOneIngredient(target, remainingingr);
+                if (String.IsNullOrEmpty(target.Name?.String))
                 {
                     i++;
                     continue;
                 }
                 foreach (IIngredientGetter ingr in potionRecipeList)
                 {
-                    IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects).ToArray();
+                    IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(ingr.Effects).ToArray();
                     ActiveEffects = ActiveEffects.Distinct();
                     IEffectGetter[] ActiveEffectsA = ActiveEffects.ToArray();
                     if (ActiveEffectsA.Length < 1)
                         continue;
                     String potionString = "<font face='$HandwrittenFont'><font size='26'>";
-                    potionString += "-<b>" + (enumerator.Current.Name + "<br><b>-<b>" + ingr.Name + "</b>");
+                    potionString += "-<b>" + (target.Name + "<br><b>-<b>" + ingr.Name + "</b>");
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
                     foreach (IEffectGetter effect in ActiveEffectsA)
@@ -126,25 +126,24 @@ namespace AddNewRecipes
 
                     potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count() + " Effect" + sstring);
                     potionString += "<\\font>";
-                    IIngredientGetter[] ingrss = { enumerator.Current, ingr };
+                    IIngredientGetter[] ingrss = { target, ingr };
                     combinations.Add(new IngrCombination(potionName, ingrss, mgeflist?.ToArray()!, potionString, type));
                 }
                 int j = i + 1;
-                IEnumerator<IIngredientGetter> enumerator2 = remainingingr.GetEnumerator();
-                while (enumerator2.MoveNext())
+                foreach (var remainingIngr in remainingingr)
                 {
-                    if (enumerator2.Current.Name?.Equals(enumerator.Current.Name) ?? true || String.IsNullOrEmpty(enumerator2.Current.Name?.String) || !enumerator.Current.Effects.Intersect(enumerator2.Current.Effects).Any())
+                    if (remainingIngr.Name?.Equals(target.Name) ?? true || String.IsNullOrEmpty(remainingIngr.Name?.String) || !target.Effects.Intersect(remainingIngr.Effects).Any())
                     {
                         j++;
                         continue;
                     }
                     List<IIngredientGetter> remainingingr2 = ingredients.Skip(j).ToList();
-                    IIngredientGetter[] potionRecipeList2 = getIngredientsMatchingTwoIngredients(enumerator.Current, enumerator2.Current, remainingingr2);
+                    IIngredientGetter[] potionRecipeList2 = getIngredientsMatchingTwoIngredients(target, remainingIngr, remainingingr2);
                     foreach (IIngredientGetter ingr in potionRecipeList2)
                     {
-                        IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(enumerator.Current.Effects);
-                        IEnumerable<IEffectGetter> ActiveEffects2 = ingr.Effects.Intersect(enumerator2.Current.Effects);
-                        IEnumerable<IEffectGetter> ActiveEffects3 = enumerator.Current.Effects.Intersect(enumerator2.Current.Effects);
+                        IEnumerable<IEffectGetter> ActiveEffects = ingr.Effects.Intersect(target.Effects);
+                        IEnumerable<IEffectGetter> ActiveEffects2 = ingr.Effects.Intersect(remainingIngr.Effects);
+                        IEnumerable<IEffectGetter> ActiveEffects3 = target.Effects.Intersect(remainingIngr.Effects);
                         ActiveEffects.ToList().AddRange(ActiveEffects2);
                         ActiveEffects.ToList().AddRange(ActiveEffects3);
                         ActiveEffects = ActiveEffects.Distinct();
@@ -152,7 +151,7 @@ namespace AddNewRecipes
                         if (ActiveEffectsA.Length < 1)
                             continue;
                         String potionString = "<font face='$HandwrittenFont'><font size='26'>";
-                        potionString += "-<b>" + (enumerator.Current.Name + "<br></b>-<b>" + enumerator2.Current.Name + "<br></b>-<b>" + ingr.Name + "</b>");
+                        potionString += "-<b>" + (target.Name + "<br></b>-<b>" + remainingIngr.Name + "<br></b>-<b>" + ingr.Name + "</b>");
                         List<String?> mgeflist = new List<String?>();
                         List<String?> mgeflists = new List<String?>();
                         foreach (IEffectGetter effect in ActiveEffects)
@@ -203,7 +202,7 @@ namespace AddNewRecipes
                             sstring = "s";
                         potionString += ("<br></font><font size='14'> Contains " + mgeflist.Count() + " Effect" + sstring);
                         potionString += "<\\font>";
-                        IIngredientGetter[] ingrss = { enumerator.Current, enumerator2.Current, ingr };
+                        IIngredientGetter[] ingrss = { target, remainingIngr, ingr };
                         combinations.Add(new IngrCombination(potionName, ingrss, mgeflist?.ToArray()!, potionString, type));
                     }
                     j++;
