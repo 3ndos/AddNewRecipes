@@ -30,7 +30,7 @@ namespace AddNewRecipes
         private static String[] containerEditorIDsA = { "TreasBanditChest", "TreasDraugrChest" }; //add containers to add the potential loot of recipe
         private static HashSet<String> containerEditorIDs = new HashSet<String>(containerEditorIDsA);
         public static double outputPercentage = 0.05; //How often to update output
-        private static int workerThreadCount = 4;
+        private static int workerThreadCount = 4;//How many threads for to process ingredients list, if you're running out of memory lower this number(will be slower but less resource intensive)
         public static async Task<int> Main(string[] args)
         {
             return await SynthesisPipeline.Instance
@@ -48,7 +48,6 @@ namespace AddNewRecipes
         public static Mutex ourMutex = new Mutex();
         private static int percent;
         public static bool finishedProcessing;
-        //public static readonly ModKey PatchRecipeesp = new ModKey("AddNewRecipes", ModType.Plugin);
         public static uint potionRecipeCount, poisonRecipeCount, impurepotionRecipeCount;
         public static int reportedCount = -1, totalProcessedCount = 0, totalIngredientCount = 0;
         public static IEnumerable<IIngredientGetter>? allIngredients;
@@ -62,7 +61,9 @@ namespace AddNewRecipes
             totalIngredientCount = ingredients.Count();
             Thread[] threads = new Thread[workerThreadCount];
             int partitionsize = (ingredients.Count() / workerThreadCount);
+            /* Split ingredient list evenly across threads */
             IEnumerable<IIngredientGetter>[] ingredientsL = ingredients.Partition(partitionsize).ToArray();
+            /* If there is a remainder add it to last thread */
             if (ingredientsL.Length > workerThreadCount)
             {
                 ingredientsL[ingredientsL.Length - 2] = ingredientsL[ingredientsL.Length - 2].Concat(ingredientsL[ingredientsL.Length - 1]);
@@ -134,7 +135,7 @@ namespace AddNewRecipes
                 masterpotionRecipeLVLIs[k] = state.PatchMod.LeveledItems.AddNew();
                 masterpotionRecipeLVLIs[k].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
                 masterpotionGlobals[k] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                masterpotionGlobals[k].Data = new Random().Next(5, 25);
+                masterpotionGlobals[k].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
                 state.PatchMod.Globals.Set(masterpotionGlobals[k]);
                 masterpotionRecipeLVLIs[k].Global = masterpotionGlobals[k];
                 masterpotionRecipeLVLIs[k].EditorID = "masterpotionRecipeList" + k;
@@ -149,7 +150,7 @@ namespace AddNewRecipes
                 potionRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
                 potionRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
                 potionGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                potionGlobals[l].Data = new Random().Next(5, 25);
+                potionGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
                 state.PatchMod.Globals.Set(potionGlobals[l]);
                 potionRecipeLVLIs[i].Global = potionGlobals[l];
                 potionRecipeLVLIs[l].EditorID = "potionRecipeList" + l;
@@ -168,7 +169,7 @@ namespace AddNewRecipes
                 poisonRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
                 poisonRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
                 poisonGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                poisonGlobals[l].Data = new Random().Next(5, 25);
+                poisonGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
                 state.PatchMod.Globals.Set(poisonGlobals[l]);
                 poisonRecipeLVLIs[i].Global = poisonGlobals[l];
                 poisonRecipeLVLIs[l].EditorID = "poisonRecipeList" + l;
@@ -187,7 +188,7 @@ namespace AddNewRecipes
                 impurepotionRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
                 impurepotionRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
                 impurepotionGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                impurepotionGlobals[l].Data = new Random().Next(5, 25);
+                impurepotionGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
                 state.PatchMod.Globals.Set(impurepotionGlobals[l]);
                 impurepotionRecipeLVLIs[i].Global = impurepotionGlobals[l];
                 impurepotionRecipeLVLIs[l].EditorID = "impurepotionRecipeList" + l;
@@ -226,17 +227,18 @@ namespace AddNewRecipes
                     name = name + "0";
                 }
                 newRecipe.EditorID = name;
+                /* Add ingredients to CACO learning recipe script */
                 if (state.LoadOrder.ContainsKey(ModKey.FromNameAndExtension("Complete Alchemy & Cooking Overhaul.esp")))
                 {
                     String[] s = (from scriptentry in newRecipe.VirtualMachineAdapter?.Scripts where scriptentry.Name.Equals("CACO_AlchemyRecipeScript") select scriptentry.Name).ToArray();
-                    if (s.Length < 1)
+                    if (s.Length < 1)//For adding recipe to a brand new item (not a copy of a vanilla recipe)
                     {
                         ScriptEntry cacoscript = new ScriptEntry();
                         cacoscript.Name = "CACO_AlchemyRecipeScript";
                         newRecipe.VirtualMachineAdapter?.Scripts.Add(cacoscript);
                     }
                     else
-                    if (newRecipe.VirtualMachineAdapter?.Scripts != null)
+                    if (newRecipe.VirtualMachineAdapter?.Scripts != null)//For modiying a copy of a vanilla recipe modified by CACO(default)
                     {
                         foreach (ScriptEntry se in newRecipe.VirtualMachineAdapter?.Scripts!)
                         {
@@ -267,198 +269,53 @@ namespace AddNewRecipes
                                 bool[,] exists = new bool[3, 4];
                                 bool[] rexists = new bool[3];
                                 bool trexist = false;
-                                foreach (ScriptProperty sp in se.Properties)
+                                foreach (ScriptProperty sp in se.Properties)//Scan CACO learning script properties
                                 {
-                                    switch (sp.Name)
+                                    if (sp.Name.Equals("ThisRecipe"))
                                     {
-                                        case "Ingredient01":
-                                            sp.Flags = ScriptProperty.Flag.Edited;
-                                            ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[0].FormKey);
-                                            rexists[0] = true;
-                                            break;
-                                        case "Ingredient02":
-                                            if (ic.MyIngrs.Length > 1)
-                                            {
-                                                sp.Flags = ScriptProperty.Flag.Edited;
-                                                ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[1].FormKey);
-                                                rexists[1] = true;
-                                            }
-                                            break;
-                                        case "Ingredient03":
-                                            if (ic.MyIngrs.Length > 2)
-                                            {
-                                                sp.Flags = ScriptProperty.Flag.Edited;
-                                                ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[2].FormKey);
-                                                rexists[2] = true;
-                                            }
-                                            break;
-                                        case "Ingredient01Effect1":
-                                            if (ingrEffectIndex[0, 0] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[0, 0];
-                                                exists[0, 0] = true;
-                                            }
-                                            break;
-                                        case "Ingredient01Effect2":
-                                            if (ingrEffectIndex[0, 1] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[0, 1];
-                                                exists[0, 1] = true;
-                                            }
-                                            break;
-                                        case "Ingredient01Effect3":
-                                            if (ingrEffectIndex[0, 2] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[0, 2];
-                                                exists[0, 2] = true;
-                                            }
-                                            break;
-                                        case "Ingredient01Effect4":
-                                            if (ingrEffectIndex[0, 3] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[0, 3];
-
-                                                exists[0, 3] = true;
-                                            }
-                                            break;
-                                        case "Ingredient02Effect1":
-                                            if (ingrEffectIndex[1, 0] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[1, 0];
-                                                exists[1, 0] = true;
-                                            }
-                                            break;
-                                        case "Ingredient02Effect2":
-                                            if (ingrEffectIndex[1, 1] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[1, 1];
-                                                exists[1, 1] = true;
-                                            }
-                                            break;
-                                        case "Ingredient02Effect3":
-                                            if (ingrEffectIndex[1, 2] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[1, 2];
-                                                exists[1, 2] = true;
-                                            }
-                                            break;
-                                        case "Ingredient02Effect4":
-                                            if (ingrEffectIndex[1, 3] != -1)
-                                            { ((ScriptIntProperty)sp).Data = ingrEffectIndex[1, 3];
-                                                exists[1, 3] = true;
-                                            }
-                                            break;
-                                        case "Ingredient03Effect1":
-                                            if (ingrEffectIndex[2, 0] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[2, 0];
-                                                exists[2, 0] = true;
-                                            }
-                                            break;
-                                        case "Ingredient03Effect2":
-                                            if (ingrEffectIndex[2, 1] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[2, 1];
-                                                exists[2, 1] = true;
-                                            }
-                                            break;
-                                        case "Ingredient03Effect3":
-                                            if (ingrEffectIndex[2, 2] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[2, 2];
-                                                exists[2, 2] = true;
-                                            }
-                                            break;
-                                        case "Ingredient03Effect4":
-                                            if (ingrEffectIndex[2, 3] != -1)
-                                            {
-                                                ((ScriptIntProperty)sp).Data = ingrEffectIndex[2, 3];
-                                                exists[2, 3] = true;
-                                            }
-                                            break;
-                                        case "ThisRecipe":
-                                            sp.Flags = ScriptProperty.Flag.Edited;
-                                            ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(newRecipe.FormKey);
-                                            trexist = true;
-                                            break;
+                                        sp.Flags = ScriptProperty.Flag.Edited;
+                                        ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(newRecipe.FormKey);
+                                        trexist = true;
                                     }
+                                    for (int j = 0; j < 3; j++)
+                                        if (sp.Name.Equals("Ingredient0" + (j + 1)))
+                                            if (ic.MyIngrs.Length > j)
+                                            {
+                                                sp.Flags = ScriptProperty.Flag.Edited;
+                                                ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[j].FormKey);
+                                                rexists[j] = true;
+                                            }
+                                    for (int j = 0; j < 3; j++)
+                                        for (int k = 0; k < 4; k++)
+                                            if (sp.Name.Equals("Ingredient0" + (j + 1) + "Effect" + (k + 1)))
+                                                if (ingrEffectIndex[j, k] != -1)
+                                                {
+                                                    ((ScriptIntProperty)sp).Data = ingrEffectIndex[j, k];
+                                                    exists[j, k] = true;
+                                                }
                                 }
                                 for (int j = 0; j < rexists.Length; j++)
-                                    switch (j)
-                                    {
-                                        case 0:
-                                            if (ic.MyIngrs.Length > 0)
-                                                if (!rexists[j])
-                                                {
-                                                    ScriptObjectProperty sop = new ScriptObjectProperty();
-                                                    sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[0].FormKey);
-                                                    sop.Name = "Ingredient01";
-                                                    sop.Flags = ScriptProperty.Flag.Edited;
-                                                    se.Properties.Add(sop);
-                                                }
-                                            break;
-                                        case 1:
-                                            if (ic.MyIngrs.Length > 1)
-                                                if (!rexists[j])
-                                                {
-                                                    ScriptObjectProperty sop = new ScriptObjectProperty();
-                                                    sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[1].FormKey);
-                                                    sop.Name = "Ingredient02";
-                                                    sop.Flags = ScriptProperty.Flag.Edited;
-                                                    se.Properties.Add(sop);
-                                                }
-                                            break;
-                                        case 2:
-                                            if (ic.MyIngrs.Length > 2)
-                                                if (!rexists[j])
-                                                {
-                                                    ScriptObjectProperty sop = new ScriptObjectProperty();
-                                                    sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[2].FormKey);
-                                                    sop.Name = "Ingredient03";
-                                                    sop.Flags = ScriptProperty.Flag.Edited;
-                                                    se.Properties.Add(sop);
-                                                }
-                                            break;
-                                    }
+                                    if (ic.MyIngrs.Length > j)
+                                        if (!rexists[j])
+                                        {
+                                            ScriptObjectProperty sop = new ScriptObjectProperty();
+                                            sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngrs[j].FormKey);
+                                            sop.Name = "Ingredient0" + (j + 1);
+                                            sop.Flags = ScriptProperty.Flag.Edited;
+                                            se.Properties.Add(sop);
+                                        }
                                 for (int j = 0; j < exists.GetLength(0); j++)
                                     for (int k = 0; k < exists.GetLength(1); k++)
                                     {
-                                        switch (j)
-                                        {
-                                            case 0:
-                                                if (ic.MyIngrs.Length > 0)
-                                                    if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
-                                                    {
-                                                        ScriptIntProperty sip = new ScriptIntProperty();
-                                                        sip.Data = ingrEffectIndex[j, k];
-                                                        sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
-                                                        sip.Flags = ScriptProperty.Flag.Edited;
-                                                        se.Properties.Add(sip);
-                                                    }
-                                                break;
-                                            case 1:
-                                                if (ic.MyIngrs.Length > 1)
-                                                    if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
-                                                    {
-                                                        ScriptIntProperty sip = new ScriptIntProperty();
-                                                        sip.Data = ingrEffectIndex[j, k];
-                                                        sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
-                                                        sip.Flags = ScriptProperty.Flag.Edited;
-                                                        se.Properties.Add(sip);
-                                                    }
-                                                break;
-                                            case 2:
-                                                if (ic.MyIngrs.Length > 2)
-                                                    if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
-                                                    {
-                                                        ScriptIntProperty sip = new ScriptIntProperty();
-                                                        sip.Data = ingrEffectIndex[j, k];
-                                                        sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
-                                                        sip.Flags = ScriptProperty.Flag.Edited;
-                                                        se.Properties.Add(sip);
-                                                    }
-                                                break;
-                                        }
+                                        if (ic.MyIngrs.Length > j)
+                                            if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
+                                            {
+                                                ScriptIntProperty sip = new ScriptIntProperty();
+                                                sip.Data = ingrEffectIndex[j, k];
+                                                sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
+                                                sip.Flags = ScriptProperty.Flag.Edited;
+                                                se.Properties.Add(sip);
+                                            }
                                     }
                                 if (!trexist)
                                 {
@@ -472,7 +329,7 @@ namespace AddNewRecipes
                         }
                     }
                 }
-               
+
                 state.PatchMod.Books.Set((Book)newRecipe);
                 LeveledItemEntry lie = new LeveledItemEntry();
                 LeveledItemEntryData data = new LeveledItemEntryData();
@@ -588,6 +445,7 @@ namespace AddNewRecipes
         public string? RecipeName { get => recipeName; set => recipeName = value; }
         public int Type { get => type; set => type = value; }
     }
+    /* Worker Thread Class */
     class ListProcessor
     {
         int threadid, startIndex;
@@ -603,7 +461,7 @@ namespace AddNewRecipes
         public void run()
         {
             int i = 0;
-            foreach (IIngredientGetter ingredient in ingredients)
+            foreach (IIngredientGetter ingredient in ingredients)//loop through all ingredients
             {
                 if (String.IsNullOrEmpty(ingredient.Name?.String))
                 {
@@ -620,7 +478,7 @@ namespace AddNewRecipes
                     IEffectGetter[] ActiveEffectsA = ActiveEffects.ToArray();
                     if (ActiveEffectsA.Length < 1)
                         continue;
-                    String potionString = "<font face='$HandwrittenFont'><font size='26'>";
+                    String potionString = "<font face='$HandwrittenFont'><font size='26'>";//Define main text for recipe
                     potionString += "-<b>" + (ingredient.Name + "<br><b>-<b>" + ingr.Name + "</b>");
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
@@ -633,7 +491,7 @@ namespace AddNewRecipes
                     }
                     String prefix = "Potion";
                     int type = 0;
-                    if (!mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())
+                    if (!mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())//Check if effects match poison
                     {
                         prefix = "Poison";
                         type = 1;
@@ -643,7 +501,7 @@ namespace AddNewRecipes
                         Program.poisonRecipeCount++;
                         Program.ourMutex.ReleaseMutex();
                     }
-                    else if (mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())
+                    else if (mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())//Check if effects match poison and potion
                     {
                         prefix = "Impure Potion";
                         type = 2;
@@ -662,7 +520,7 @@ namespace AddNewRecipes
                         Program.ourMutex.ReleaseMutex();
                     }
                     potionString += "</font><font face='$HandwrittenFont'><font size='18'><br> to make " + prefix + " of ";
-                    String potionName = "Recipe: ";
+                    String potionName = "Recipe: ";//Define recipe name
                     for (int k = 0; k < mgeflist.Count; k++)
                     {
                         if (k > 0)
