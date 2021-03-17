@@ -14,8 +14,6 @@ namespace AddNewRecipes
 {
     public class Program
     {
-        private static String[] potionWordsA = { "Fortify", "Regenerate", "Resist", "Restore", "Waterbreathing", "Invisibility", "Speed" };
-        private static String[] poisonWordsA = { "Damage", "Ravage", "Fear", "Slow", "Paralyze", "Weakness" };
         private static String[] SkipPlugins = { "bsassets", "bsheartland", "bs_dlc_patch", "bs_Campfire", "beyond skyrim", "bruma" }; //mods containing these names will be skipped(IF ADDING KEEP LOWERCASE)
         private static String[] SkipIngrs = { "Jarrin" }; //ingredients containing these words will be skipped
         public static int impureSkipThreshold = 2; // impure potions with this or less number of effects will be skipped
@@ -23,16 +21,13 @@ namespace AddNewRecipes
         public static int poisonSkipThreshold = 1; // potions with this or less number of effects will be skipped
         private static float recipeWeight = 0f;//how much will the recipes weigh
         private static uint recipeValue = 250;//how much will the recipes be worth
+        private static bool hasValueAfterRead = true;//only takes effect if Complete Alchemy and Cooking Overhaul is installed
         private static bool learnEffectsFromRecipe = true;//only takes effect if Complete Alchemy and Cooking Overhaul is installed, recommended to also install the included patch for CACO
         private static int minChance = 5;//min chance(5%) of receiving a recipe
         private static int maxChance = 25;//max chance(25%) of receiving a recipe
         private static String[] containerEditorIDsA = { "TreasBanditChest", "TreasDraugrChest" }; //add containers to add the potential loot of recipe
         public static double outputPercentage = 0.05; //How often to update output
         private static int workerThreadCount = 4;//How many threads for to process ingredients list, if you're running out of memory lower this number(will be slower but less resource intensive)
-
-
-        public static HashSet<String> potionWords = new HashSet<String>(potionWordsA);
-        public static HashSet<String> poisonWords = new HashSet<String>(poisonWordsA);
         private static HashSet<String> containerEditorIDs = new HashSet<String>(containerEditorIDsA);
         public static async Task<int> Main(string[] args)
         {
@@ -47,6 +42,7 @@ namespace AddNewRecipes
                     }
                 });
         }
+        private static String[] badKeywords = { "MagicAlchHarmful" };
         public static List<IngrCombination> combinations = new List<IngrCombination>();
         public static Mutex ourMutex = new Mutex();
         private static int percent;
@@ -55,10 +51,12 @@ namespace AddNewRecipes
         public static int reportedCount = -1, totalProcessedCount = 0, totalIngredientCount = 0;
         public static IEnumerable<IIngredientGetter>? allIngredients;
         public static Stopwatch sw = new Stopwatch();
+        public static IEnumerable<IFormLink<IKeyword>>? badKeywordsF;
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
         {
+
+            badKeywordsF = (from keyword in state.LoadOrder.PriorityOrder.OnlyEnabled().Keyword().WinningOverrides() where badKeywords.Contains(keyword.EditorID) select (IFormLink<IKeyword>)(new FormLink<IKeyword>(keyword.FormKey))).ToList();
             IEnumerable<IIngredientGetter> ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides().Where(x => !SkipPlugins.Contains(x.FormKey.ModKey.Name.ToLower())).Where(x => (!SkipIngrs.Intersect(x.Name?.ToString()?.Split()!).Any() || SkipIngrs.Contains(x.Name?.ToString()))).Where(x => !String.IsNullOrEmpty(x.Name?.String)).ToList();
-            ingredients = from ingrs in ingredients where !String.IsNullOrEmpty(ingrs.Name?.String) select ingrs;
             allIngredients = ingredients;
             percent = (int)(ingredients.Count() * outputPercentage);
             totalIngredientCount = ingredients.Count();
@@ -201,7 +199,6 @@ namespace AddNewRecipes
             }
             Console.WriteLine("Splitting potions into lists (" + potionRecipeListCount + " " + poisonRecipeListCount + " " + impurepotionRecipeListCount + ")");
             uint potionIndex = 0, poisonIndex = 0, impurepotionIndex = 0;
-            IEffectGetter[] effectCache = getAllEffects(ingredients).ToArray();
             Dictionary<String, int> nameCache = new Dictionary<String, int>();
             foreach (IngrCombination ic in combinations)
             {
@@ -209,7 +206,12 @@ namespace AddNewRecipes
                     Console.WriteLine(i + " out of " + combinations.Count + " recipes created.");
                 IBook newRecipe = noteTemplate.DeepCopy();
                 newRecipe.FormKey = state.PatchMod.GetNextFormKey();
-                newRecipe.Description = ic.RecipeName;
+                String prefix = "[Potion]";
+                if (ic.Type == 1)
+                    prefix = "[Poison]";
+                if (ic.Type == 2)
+                    prefix = "[Impure Potion]";
+                newRecipe.Description = prefix+ic.RecipeName;
                 newRecipe.Name = ic.RecipeName;
                 newRecipe.BookText = ic.PotionString;
                 newRecipe.Weight = recipeWeight;
@@ -231,24 +233,29 @@ namespace AddNewRecipes
                 }
                 newRecipe.EditorID = name;
                 /* Add ingredients to CACO learning recipe script */
-                if (state.LoadOrder.ContainsKey(ModKey.FromNameAndExtension("Complete Alchemy & Cooking Overhaul.esp")) && learnEffectsFromRecipe)
+                if (state.LoadOrder.ContainsKey(ModKey.FromNameAndExtension("Complete Alchemy & Cooking Overhaul.esp")))
                 {
                     String[] s = (from scriptentry in newRecipe.VirtualMachineAdapter?.Scripts where scriptentry.Name.Equals("CACO_AlchemyRecipeScript") select scriptentry.Name).ToArray();
-                    if (s.Length < 1)//For adding recipe to a brand new item (not a copy of a vanilla recipe)
+                    if (s.Length < 1 && learnEffectsFromRecipe)//For adding recipe to a brand new item (not a copy of a vanilla recipe)
                     {
                         ScriptEntry cacoscript = new ScriptEntry();
                         cacoscript.Name = "CACO_AlchemyRecipeScript";
                         newRecipe.VirtualMachineAdapter?.Scripts.Add(cacoscript);
                     }
-                    else
                     if (newRecipe.VirtualMachineAdapter?.Scripts != null)//For modiying a copy of a vanilla recipe modified by CACO(default)
                     {
+
                         foreach (ScriptEntry se in newRecipe.VirtualMachineAdapter?.Scripts!)
                         {
                             if (se == null)
                                 continue;
                             if (se.Name.Equals("CACO_AlchemyRecipeScript"))
                             {
+                                if (!learnEffectsFromRecipe)
+                                {
+                                    newRecipe.VirtualMachineAdapter?.Scripts?.Remove(se);
+                                    continue;
+                                }
                                 int[,] ingrEffectIndex = new int[3, 4];
                                 for (int j = 0; j < ingrEffectIndex.GetLength(0); j++)
                                     for (int k = 0; k < ingrEffectIndex.GetLength(1); k++)
@@ -262,10 +269,8 @@ namespace AddNewRecipes
                                         {
 
                                             state.LinkCache.TryResolve<IMagicEffectGetter>(ic.MyIngrs[j].Effects[k].BaseEffect.FormKey, out var mgeffect);
-                                            Console.WriteLine(mgefname + " compared to " + mgeffect?.Name?.String + " on " + ic.MyIngrs[j].Name?.String);
                                             if (mgeffect?.Name?.String?.Equals(mgefname) ?? true)
                                             {
-                                                Console.WriteLine("ingredient " + ic.MyIngrs[j].Name + " " + offset + " " + k);
                                                 ingrEffectIndex[j, offset++] = k;
                                             }
                                         }
@@ -274,14 +279,24 @@ namespace AddNewRecipes
                                 }
                                 bool[,] exists = new bool[3, 4];
                                 bool[] rexists = new bool[3];
-                                bool trexist = false;
+                                bool trexist = false, nvarexist = false, arrexist = false;
                                 foreach (ScriptProperty sp in se.Properties)//Scan CACO learning script properties
                                 {
-                                    if (sp.Name.Equals("ThisRecipe"))
+                                    switch (sp.Name)
                                     {
+                                        case "ThisRecipe":
                                         sp.Flags = ScriptProperty.Flag.Edited;
                                         ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(newRecipe.FormKey);
                                         trexist = true;
+                                            break;
+                                        case "NoValueAfterRead":
+                                            sp.Flags = ScriptProperty.Flag.Edited;
+                                            ((ScriptBoolProperty)sp).Data = hasValueAfterRead;
+                                            nvarexist = true;
+                                            break;
+                                        case "CACO_AlchemyRecipesRead":
+                                            arrexist = true;
+                                            break;
                                     }
                                     for (int j = 0; j < 3; j++)
                                         if (sp.Name.Equals("Ingredient0" + (j + 1)))
@@ -313,21 +328,38 @@ namespace AddNewRecipes
                                 for (int j = 0; j < exists.GetLength(0); j++)
                                     for (int k = 0; k < exists.GetLength(1); k++)
                                     {
-                                        //if (ic.MyIngrs.Length > j)
-                                        if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
-                                        {
-                                            ScriptIntProperty sip = new ScriptIntProperty();
-                                            sip.Data = ingrEffectIndex[j, k];
-                                            sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
-                                            sip.Flags = ScriptProperty.Flag.Edited;
-                                            se.Properties.Add(sip);
-                                        }
+                                        if (ic.MyIngrs.Length > j)
+                                            if (!exists[j, k] && ingrEffectIndex[j, k] != -1)
+                                            {
+                                                ScriptIntProperty sip = new ScriptIntProperty();
+                                                sip.Data = ingrEffectIndex[j, k];
+                                                sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
+                                                sip.Flags = ScriptProperty.Flag.Edited;
+                                                se.Properties.Add(sip);
+                                            }
                                     }
                                 if (!trexist)
                                 {
                                     ScriptObjectProperty sop = new ScriptObjectProperty();
                                     sop.Object = new FormLink<ISkyrimMajorRecordGetter>(newRecipe.FormKey);
                                     sop.Name = "ThisRecipe";
+                                    sop.Flags = ScriptProperty.Flag.Edited;
+                                    se.Properties.Add(sop);
+                                }
+                                if(!nvarexist)
+                                {
+                                    ScriptBoolProperty sbp = new ScriptBoolProperty();
+                                    sbp.Data = hasValueAfterRead;
+                                    sbp.Name = "NoValueAfterRead";
+                                    sbp.Flags = ScriptProperty.Flag.Edited;
+                                    se.Properties.Add(sbp);
+                                }
+                                if(arrexist)
+                                {
+                                    FormList fl = new FormList(new FormKey(new ModKey("Complete Alchemy & Cooking Overhaul.esp", ModType.Plugin), 0xA2C667), SkyrimRelease.SkyrimSE);
+                                    ScriptObjectProperty sop = new ScriptObjectProperty();
+                                    sop.Object = fl;
+                                    sop.Name = "CACO_AlchemyRecipesRead";
                                     sop.Flags = ScriptProperty.Flag.Edited;
                                     se.Properties.Add(sop);
                                 }
@@ -420,15 +452,6 @@ namespace AddNewRecipes
                 rChest.Items?.Add(potionListContainerEntry);
             }
         }
-        private static IEnumerable<IEffectGetter> getAllEffects(IEnumerable<IIngredientGetter> ingrs)
-        {
-            IEnumerable<IEffectGetter> effects = Enumerable.Empty<IEffectGetter>();
-            foreach (var ingr in ingrs)
-                foreach (var effect in ingr.Effects)
-                    effects.ToList().Add(effect);
-            effects = effects.Distinct();
-            return effects;
-        }
     }
     public class IngrCombination
     {
@@ -489,16 +512,22 @@ namespace AddNewRecipes
 
                     List<String?> mgeflist = new List<String?>();
                     List<String?> mgeflists = new List<String?>();
+                    List<bool> mgeflistD = new List<bool>();
                     for (int n = 0; n < ActiveEffectsA.Length; n++)
                     {
                         IEffectGetter effect = ActiveEffectsA[n];
                         state.LinkCache.TryResolve<IMagicEffectGetter>(effect.BaseEffect.FormKey, out var mgeffect);
                         mgeflist.Add(mgeffect?.Name?.String);
                         mgeflists.AddRange(mgeffect?.Name?.String?.Split()!);
+                        IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect.Keywords;
+                        if (mgeffect.Flags.HasFlag(MagicEffect.Flag.Detrimental) || mgeffect.Flags.HasFlag(MagicEffect.Flag.Hostile) && (thisKeywords?.Intersect(Program.badKeywordsF!).Any() ?? true))
+                            mgeflistD.Add(true);
+                        else
+                            mgeflistD.Add(false);
                     }
                     String prefix = "Potion";
                     int type = 0;
-                    if (!mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())//Check if effects match poison
+                    if (mgeflistD.All(x => x.Equals(true)))
                     {
                         prefix = "Poison";
                         type = 1;
@@ -508,7 +537,7 @@ namespace AddNewRecipes
                         Program.poisonRecipeCount++;
                         Program.ourMutex.ReleaseMutex();
                     }
-                    else if (mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())//Check if effects match poison and potion
+                    else if (mgeflistD.Contains(true))//Check if effects match poison and potion
                     {
                         prefix = "Impure Potion";
                         type = 2;
@@ -577,16 +606,22 @@ namespace AddNewRecipes
                         potionString = "-<b>" + (ingredient.Name + "<br></b>-<b>" + ingredient2.Name + "<br></b>-<b>" + ingr.Name + "</b>");
                         List<String?> mgeflist = new List<String?>();
                         List<String?> mgeflists = new List<String?>();
+                        List<bool> mgeflistD = new List<bool>();
                         for (int n = 0; n < ActiveEffectsA.Length; n++)
                         {
                             IEffectGetter effect = ActiveEffectsA[n];
                             state.LinkCache.TryResolve<IMagicEffectGetter>(effect.BaseEffect.FormKey, out var mgeffect);
                             mgeflist.Add(mgeffect?.Name?.String);
                             mgeflists.AddRange(mgeffect?.Name?.String?.Split()!);
+                            IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect.Keywords;
+                            if (mgeffect.Flags.HasFlag(MagicEffect.Flag.Detrimental) || mgeffect.Flags.HasFlag(MagicEffect.Flag.Hostile) && (thisKeywords?.Intersect(Program.badKeywordsF!).Any() ?? true))
+                                mgeflistD.Add(true);
+                            else
+                                mgeflistD.Add(false);
                         }
                         String prefix = "Potion";
                         int type = 0;
-                        if (!mgeflists.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())
+                        if (mgeflistD.All(x => x.Equals(true)))
                         {
                             prefix = "Poison";
                             type = 1;
@@ -596,11 +631,11 @@ namespace AddNewRecipes
                             Program.poisonRecipeCount++;
                             Program.ourMutex.ReleaseMutex();
                         }
-                        else if (mgeflist.Intersect(Program.potionWords.ToList()).Any() && mgeflists.Intersect(Program.poisonWords.ToList()).Any())
+                        else if (mgeflistD.Contains(true))//Check if effects match poison and potion
                         {
                             prefix = "Impure Potion";
                             type = 2;
-                            if (mgeflists.Count <= Program.impureSkipThreshold)
+                            if (mgeflist.Count <= Program.impureSkipThreshold)
                                 continue;
                             Program.ourMutex.WaitOne();
                             Program.impurepotionRecipeCount++;
