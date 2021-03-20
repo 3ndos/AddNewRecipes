@@ -823,7 +823,6 @@ namespace AddNewRecipes
             List<IIngredientGetter> matchingIngredients = new List<IIngredientGetter>();
             List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
 
-            //return (from matchingEffects in otherIngredients.ToList() where (firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey)) select matchingEffects).ToArray();
             foreach (IIngredientGetter ieg in otherIngredients)
             {
                 List<FormKey> otherIngredientEffectKeys = getEffectFormKeys(ieg);
@@ -835,9 +834,6 @@ namespace AddNewRecipes
 
         private IIngredientGetter[] getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
-            //    List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
-            //    List<IEffectGetter> secondIngredientEffects = secondIngredient.Effects.ToList();
-            //    return (from matchingEffects in otherIngredients.ToList() where ((firstIngredientEffects.Intersect(matchingEffects.Effects).Any() || firstIngredientEffects.Intersect(secondIngredientEffects).Any()) && (secondIngredientEffects.Intersect(matchingEffects.Effects).Any() || secondIngredientEffects.Intersect(matchingEffects.Effects).Any())  && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey) && !secondIngredient.FormKey.Equals(matchingEffects.FormKey) && !firstIngredient.FormKey.Equals(secondIngredient.FormKey))) select matchingEffects).ToArray();
             otherIngredients = from otherIngredient in otherIngredients where !secondIngredient.FormKey.Equals(firstIngredient.FormKey) && !otherIngredient.FormKey.Equals(secondIngredient.FormKey) && !otherIngredient.FormKey.Equals(firstIngredient.FormKey) select otherIngredient;
             List<IIngredientGetter> matchingIngredients = new List<IIngredientGetter>();
             List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
@@ -851,40 +847,6 @@ namespace AddNewRecipes
             return matchingIngredients.ToArray();
         }
 
-        //private IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
-        //{
-        //    return (from matchingIngredient in otherIngredients.ToList() where (firstIngredient.Effects.Intersect(matchingIngredient.Effects.ToList()).Any()) && (!firstIngredient.FormKey.Equals(matchingIngredient.FormKey)) select matchingIngredient).ToArray();
-        //    //List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
-        //    //List<IIngredientGetter> otherIngredientsL = (from otherIngredient in otherIngredients where !firstIngredient.FormKey.Equals(otherIngredient.FormKey) select otherIngredient).ToList();
-        //    //List<IIngredientGetter> otherIngredientsLR = otherIngredientsL;
-        //    //for (int i = 0; i < otherIngredientsL.Count; i++)
-        //    //{
-        //    //    IIngredientGetter otherIngredient = otherIngredientsL.ElementAt(i);
-        //    //    List<FormKey> otherIngredientEffectKeys = getEffectFormKeys(otherIngredient);
-        //    //    if (!otherIngredientEffectKeys.Intersect(firstIngredientEffectKeys).Any())
-        //    //        otherIngredientsLR.Remove(otherIngredient);
-        //    //}
-        //    //return otherIngredientsLR.ToArray();
-        //}
-        //private IIngredientGetter[] getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
-        //{
-
-        //    return (from matchingIngredient in otherIngredients where (firstIngredient.Effects.Intersect(secondIngredient.Effects).Any() || firstIngredient.Effects.Intersect(matchingIngredient.Effects).Any()) && (secondIngredient.Effects.Intersect(firstIngredient.Effects).Any() || secondIngredient.Effects.Intersect(matchingIngredient.Effects).Any()) && (matchingIngredient.Effects.Intersect(firstIngredient.Effects).Any() || matchingIngredient.Effects.Intersect(secondIngredient.Effects).Any()) && (!firstIngredient.FormKey.Equals(secondIngredient.FormKey)) && (!secondIngredient.FormKey.Equals(matchingIngredient.FormKey)) && (!firstIngredient.FormKey.Equals(matchingIngredient.FormKey)) select matchingIngredient).ToArray();
-        //    //List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
-        //    //List<FormKey> secondIngredientEffectKeys = getEffectFormKeys(secondIngredient);
-        //    //firstIngredientEffectKeys.AddRange(secondIngredientEffectKeys);
-        //    //firstIngredientEffectKeys = firstIngredientEffectKeys.AsEnumerable().Distinct().ToList();
-        //    //List<IIngredientGetter> otherIngredientsL = (from otherIngredient in otherIngredients where !firstIngredient.FormKey.Equals(secondIngredient.FormKey) && !firstIngredient.FormKey.Equals(otherIngredient.FormKey) && !secondIngredient.FormKey.Equals(otherIngredient.FormKey) select otherIngredient).ToList();
-        //    //List<IIngredientGetter> otherIngredientsLR = otherIngredientsL;
-        //    //for (int i = 0; i < otherIngredientsL.Count; i++)
-        //    //{
-        //    //    IIngredientGetter otherIngredient = otherIngredientsL.ElementAt(i);
-        //    //    List<FormKey> otherIngredientEffectKeys = getEffectFormKeys(otherIngredient);
-        //    //    if (!otherIngredientEffectKeys.Intersect(firstIngredientEffectKeys).Any())
-        //    //        otherIngredientsLR.Remove(otherIngredient);
-        //    //}
-        //    //return otherIngredientsLR.ToArray();
-        //}
         private List<FormKey> getEffectFormKeys(IIngredientGetter ingredient)
         {
             List<FormKey> formkeys = new List<FormKey>();
