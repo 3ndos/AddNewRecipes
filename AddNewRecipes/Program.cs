@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -62,7 +61,13 @@ namespace AddNewRecipes
                 Console.WriteLine("Cannot find settings file, using default values.");
             }
 
-
+            ModKey[] modkeys = new ModKey[(int)Config?.ESPCount!];
+            SkyrimMod[] mods = new SkyrimMod[(int)Config?.ESPCount!];
+            for (int u = 0; u < Config?.ESPCount; u++)
+            {
+                modkeys[u] = new ModKey("AddNewRecipe-" + u, ModType.Plugin);
+                mods[u] = new SkyrimMod(modkeys[u], SkyrimRelease.SkyrimSE);
+            }
             ContainerEditorIDs = new HashSet<string>(Config?.ContainerEditorIds!);
             BadKeywordsF = (from keyword in state.LoadOrder.PriorityOrder.OnlyEnabled().Keyword().WinningOverrides() where BadKeywords.Contains(keyword.EditorID) select (IFormLink<IKeyword>)(new FormLink<IKeyword>(keyword.FormKey))).ToList();
             IEnumerable<IIngredientGetter> ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides().Where(x => !Config.SkipPlugins.Contains(x.FormKey.ModKey.Name.ToLower())).Where(x => (!Config.SkipIngredients.Intersect(x.Name?.ToString()?.Split()!).Any() || Config.SkipIngredients.Contains(x.Name?.ToString()!))).Where(x => !String.IsNullOrEmpty(x.EditorID)).ToList();
@@ -116,105 +121,155 @@ namespace AddNewRecipes
             Percent = (int)(Combinations.Count * Config?.OutputPercentage!);
             int i = 0;
             /* Main leveled list that gets added to recipe drop */
-            LeveledItem mainpotionRecipeLVLI = state.PatchMod.LeveledItems.AddNew();
-            LeveledItemEntry mainpotionRecipeLVLIentry = new LeveledItemEntry();
-            mainpotionRecipeLVLI.Entries = new Noggog.ExtendedList<LeveledItemEntry>();
-            LeveledItemEntryData mainpotionRecipeLVLIentrydata = new LeveledItemEntryData();
-            GlobalInt mainpotionGlobal = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-            mainpotionGlobal.Data = new Random().Next((int)Config?.MinChance!, (int)Config?.MaxChance!);
-            state.PatchMod.Globals.Set(mainpotionGlobal);
-            mainpotionRecipeLVLI.Global = mainpotionGlobal;
-            mainpotionRecipeLVLI.EditorID = "mainpotionRecipeList";
+            LeveledItem[] mainpotionRecipeLVLI = new LeveledItem[mods.Length];
+            LeveledItemEntry[] mainpotionRecipeLVLIentry = new LeveledItemEntry[mods.Length];
+            LeveledItemEntryData[] mainpotionRecipeLVLIentrydata = new LeveledItemEntryData[mods.Length];
+            for (int k = 0; k < mods.Length; k++)
+            {
+                mainpotionRecipeLVLI[k] = mods[k].LeveledItems.AddNew();
+                mainpotionRecipeLVLIentry[k] = new LeveledItemEntry();
+                mainpotionRecipeLVLI[k].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
+                mainpotionRecipeLVLIentrydata[k] = new LeveledItemEntryData();
+                GlobalInt mainpotionGlobal = new GlobalInt(mods[k].GetNextFormKey(), SkyrimRelease.SkyrimSE);
+                mainpotionGlobal.Data = new Random().Next((int)Config?.MinChance!, (int)Config?.MaxChance!);
+                mods[k].Globals.Set(mainpotionGlobal);
+                mainpotionRecipeLVLI[k].Global = mainpotionGlobal;
+                mainpotionRecipeLVLI[k].EditorID = "mainpotionRecipeList" + k;
+            }
             /* Must split sub leveled lists because it can only hold 128 items */
-            uint potionRecipeListCount = (PotionRecipeCount / 128) + 1;
-            uint poisonRecipeListCount = (PoisonRecipeCount / 128) + 1;
-            uint impurepotionRecipeListCount = (ImpurepotionRecipeCount / 128) + 1;
-            LeveledItem[] potionRecipeLVLIs = new LeveledItem[potionRecipeListCount];
-            uint masterpotionRecipeListCount = ((potionRecipeListCount + poisonRecipeListCount + impurepotionRecipeListCount) / 128) + 1;
-            LeveledItem[] masterpotionRecipeLVLIs = new LeveledItem[masterpotionRecipeListCount];
-            LeveledItemEntry[] masterpotionRecipeLVLIentries = new LeveledItemEntry[masterpotionRecipeListCount];
-            LeveledItemEntryData[] masterpotionRecipeLVLIentriesdata = new LeveledItemEntryData[masterpotionRecipeListCount];
-            GlobalInt[] masterpotionGlobals = new GlobalInt[masterpotionRecipeListCount];
-            LeveledItemEntry[] potionRecipeLVLIentries = new LeveledItemEntry[potionRecipeListCount];
-            LeveledItemEntryData[] potionRecipeLVLIentriesdata = new LeveledItemEntryData[potionRecipeListCount];
-            GlobalInt[] potionGlobals = new GlobalInt[potionRecipeListCount];
-            for (int k = 0; k < masterpotionRecipeListCount; k++)
+            uint[] potionRecipeListCount = new uint[mods.Length];
+            uint[] poisonRecipeListCount = new uint[mods.Length];
+            uint[] impurepotionRecipeListCount = new uint[mods.Length];
+            uint[] masterpotionRecipeListCount = new uint[mods.Length];
+            uint[] potionIndex = new uint[mods.Length], poisonIndex = new uint[mods.Length], impurepotionIndex = new uint[mods.Length];
+            List<GlobalInt[]> potionGlobals = new List<GlobalInt[]>();
+            List<LeveledItem[]> potionRecipeLVLIs = new List<LeveledItem[]>();
+            List<LeveledItem[]> masterpotionRecipeLVLIs = new List<LeveledItem[]>();
+            List<LeveledItemEntry[]> masterpotionRecipeLVLIentries = new List<LeveledItemEntry[]>();
+            List<LeveledItemEntryData[]> masterpotionRecipeLVLIentriesdata = new List<LeveledItemEntryData[]>();
+            List<GlobalInt[]> masterpotionGlobals = new List<GlobalInt[]>();
+            List<LeveledItemEntry[]> potionRecipeLVLIentries = new List<LeveledItemEntry[]>();
+            List<LeveledItemEntryData[]> potionRecipeLVLIentriesdata = new List<LeveledItemEntryData[]>(); ;
+            List<LeveledItem[]> poisonRecipeLVLIs = new List<LeveledItem[]>();
+            List<LeveledItemEntry[]> poisonRecipeLVLIentries = new List<LeveledItemEntry[]>();
+            List<LeveledItemEntryData[]> poisonRecipeLVLIentriesdata = new List<LeveledItemEntryData[]>();
+            List<GlobalInt[]> poisonGlobals = new List<GlobalInt[]>();
+            List<LeveledItem[]> impurepotionRecipeLVLIs = new List<LeveledItem[]>();
+            List<LeveledItemEntry[]> impurepotionRecipeLVLIentries = new List<LeveledItemEntry[]>();
+            List<LeveledItemEntryData[]> impurepotionRecipeLVLIentriesdata = new List<LeveledItemEntryData[]>();
+            List<GlobalInt[]> impurepotionGlobals = new List<GlobalInt[]>();
+            for (int j = 0; j < mods.Length; j++)
             {
-                masterpotionRecipeLVLIentries[k] = new LeveledItemEntry();
-                masterpotionRecipeLVLIentriesdata[k] = new LeveledItemEntryData();
-                masterpotionRecipeLVLIs[k] = state.PatchMod.LeveledItems.AddNew();
-                masterpotionRecipeLVLIs[k].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
-                masterpotionGlobals[k] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                masterpotionGlobals[k].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
-                state.PatchMod.Globals.Set(masterpotionGlobals[k]);
-                masterpotionRecipeLVLIs[k].Global = masterpotionGlobals[k];
-                masterpotionRecipeLVLIs[k].EditorID = "masterpotionRecipeList" + k;
-                masterpotionRecipeLVLIentriesdata[k].Reference = masterpotionRecipeLVLIs[k].FormKey;
-                masterpotionRecipeLVLIentriesdata[k].Level = 1;
-                masterpotionRecipeLVLIentriesdata[k].Count = 1;
+                potionRecipeListCount[j] = PotionRecipeCount / 128  + 1;
+                poisonRecipeListCount[j] = PoisonRecipeCount / 128 + 1;
+                impurepotionRecipeListCount[j] = ImpurepotionRecipeCount / 128 + 1;
+                potionGlobals.Add(new GlobalInt[potionRecipeListCount[j]]);
+                potionRecipeLVLIs.Add(new LeveledItem[potionRecipeListCount[j]]);
+                masterpotionRecipeListCount[j] = ((((potionRecipeListCount[j] + poisonRecipeListCount[j] + impurepotionRecipeListCount[j]) ) / 128) + 1);
+                masterpotionRecipeLVLIs.Add(new LeveledItem[masterpotionRecipeListCount[j]]);
+                masterpotionRecipeLVLIentries.Add(new LeveledItemEntry[masterpotionRecipeListCount[j]]);
+                masterpotionRecipeLVLIentriesdata.Add(new LeveledItemEntryData[masterpotionRecipeListCount[j]]);
+                masterpotionGlobals.Add(new GlobalInt[masterpotionRecipeListCount[j]]);
+                potionRecipeLVLIentries.Add(new LeveledItemEntry[potionRecipeListCount[j]]);
+                potionRecipeLVLIentriesdata.Add(new LeveledItemEntryData[potionRecipeListCount[j]]);
+                for (int k = 0; k < masterpotionRecipeListCount[j]; k++)
+                {
+
+                    LeveledItemEntry entry = new LeveledItemEntry();
+                    LeveledItemEntryData entrydata = new LeveledItemEntryData();
+                    LeveledItem LVLI = mods[j].LeveledItems.AddNew();
+                    LVLI.Entries = new Noggog.ExtendedList<LeveledItemEntry>();
+                    GlobalInt globalint = new GlobalInt(mods[j].GetNextFormKey(), SkyrimRelease.SkyrimSE);
+                    globalint.Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
+                    mods[j].Globals.Set(globalint);
+                    LVLI.Global = globalint;
+                    LVLI.EditorID = "masterpotionRecipeList" + j + "-" + k;
+                    entrydata.Reference = LVLI.FormKey;
+                    entrydata.Level = 1;
+                    entrydata.Count = 1;
+                    masterpotionRecipeLVLIentries.ElementAt(j)[k] = entry;
+                    masterpotionRecipeLVLIentriesdata.ElementAt(j)[k] = entrydata;
+                    masterpotionGlobals.ElementAt(j)[k] = globalint;
+                    masterpotionRecipeLVLIs.ElementAt(j)[k] = (LVLI);
+                }
+                for (int l = 0; l < potionRecipeListCount[j]; l++)
+                {
+                    potionRecipeLVLIentries.ElementAt(j)[l] = new LeveledItemEntry();
+                    potionRecipeLVLIentriesdata.ElementAt(j)[l] = new LeveledItemEntryData();
+                    potionRecipeLVLIs.ElementAt(j)[l] = mods[j].LeveledItems.AddNew();
+                    potionRecipeLVLIs.ElementAt(j)[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
+                    potionGlobals.ElementAt(j)[l] = new GlobalInt(mods[j].GetNextFormKey(), SkyrimRelease.SkyrimSE);
+                    potionGlobals.ElementAt(j)[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
+                    mods[j].Globals.Set(potionGlobals.ElementAt(j)[l]);
+                    potionRecipeLVLIs.ElementAt(j)[l].Global = potionGlobals.ElementAt(j)[l];
+                    potionRecipeLVLIs.ElementAt(j)[l].EditorID = "potionRecipeList" + j + "-" + l;
+                    potionRecipeLVLIentriesdata.ElementAt(j)[l].Reference = potionRecipeLVLIs.ElementAt(j)[l].FormKey;
+                    potionRecipeLVLIentriesdata.ElementAt(j)[l].Level = 1;
+                    potionRecipeLVLIentriesdata.ElementAt(j)[l].Count = 1;
+                }
+                poisonRecipeLVLIs.Add(new LeveledItem[poisonRecipeListCount[j]]);
+                poisonRecipeLVLIentries.Add(new LeveledItemEntry[poisonRecipeListCount[j]]);
+                poisonRecipeLVLIentriesdata.Add(new LeveledItemEntryData[poisonRecipeListCount[j]]);
+                poisonGlobals.Add(new GlobalInt[poisonRecipeListCount[j]]);
+                for (int l = 0; l < poisonRecipeListCount[j]; l++)
+                {
+                    poisonRecipeLVLIentries.ElementAt(j)[l] = new LeveledItemEntry();
+                    poisonRecipeLVLIentriesdata.ElementAt(j)[l] = new LeveledItemEntryData();
+                    poisonRecipeLVLIs.ElementAt(j)[l] = mods[j].LeveledItems.AddNew();
+                    poisonRecipeLVLIs.ElementAt(j)[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
+                    poisonGlobals.ElementAt(j)[l] = new GlobalInt(mods[j].GetNextFormKey(), SkyrimRelease.SkyrimSE);
+                    poisonGlobals.ElementAt(j)[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
+                    mods[j].Globals.Set(poisonGlobals.ElementAt(j)[l]);
+                    poisonRecipeLVLIs.ElementAt(j)[l].Global = poisonGlobals.ElementAt(j)[l];
+                    poisonRecipeLVLIs.ElementAt(j)[l].EditorID = "poisonRecipeList" + j + "-" + l; ;
+                    poisonRecipeLVLIentriesdata.ElementAt(j)[l].Reference = poisonRecipeLVLIs.ElementAt(j)[l].FormKey;
+                    poisonRecipeLVLIentriesdata.ElementAt(j)[l].Level = 1;
+                    poisonRecipeLVLIentriesdata.ElementAt(j)[l].Count = 1;
+                }
+                impurepotionRecipeLVLIs.Add(new LeveledItem[impurepotionRecipeListCount[j]]);
+                impurepotionRecipeLVLIentries.Add(new LeveledItemEntry[impurepotionRecipeListCount[j]]);
+                impurepotionRecipeLVLIentriesdata.Add(new LeveledItemEntryData[impurepotionRecipeListCount[j]]);
+                impurepotionGlobals.Add(new GlobalInt[impurepotionRecipeListCount[j]]);
+                for (int l = 0; l < impurepotionRecipeListCount[j]; l++)
+                {
+                    impurepotionRecipeLVLIentries.ElementAt(j)[l] = new LeveledItemEntry();
+                    impurepotionRecipeLVLIentriesdata.ElementAt(j)[l] = new LeveledItemEntryData();
+                    impurepotionRecipeLVLIs.ElementAt(j)[l] = mods[j].LeveledItems.AddNew();
+                    impurepotionRecipeLVLIs.ElementAt(j)[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
+                    impurepotionGlobals.ElementAt(j)[l] = new GlobalInt(mods[j].GetNextFormKey(), SkyrimRelease.SkyrimSE);
+                    impurepotionGlobals.ElementAt(j)[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
+                    mods[j].Globals.Set(impurepotionGlobals.ElementAt(j)[l]);
+                    impurepotionRecipeLVLIs.ElementAt(j)[l].Global = impurepotionGlobals.ElementAt(j)[l];
+                    impurepotionRecipeLVLIs.ElementAt(j)[l].EditorID = "impurepotionRecipeList" + j + "-" + l; ;
+                    impurepotionRecipeLVLIentriesdata.ElementAt(j)[l].Reference = impurepotionRecipeLVLIs.ElementAt(j)[l].FormKey;
+                    impurepotionRecipeLVLIentriesdata.ElementAt(j)[l].Level = 1;
+                    impurepotionRecipeLVLIentriesdata.ElementAt(j)[l].Count = 1;
+                }
+                Console.WriteLine("Splitting potions into lists (" + potionRecipeListCount[j] + " " + poisonRecipeListCount[j] + " " + impurepotionRecipeListCount[j] + ")");
             }
-            for (int l = 0; l < potionRecipeListCount; l++)
-            {
-                potionRecipeLVLIentries[l] = new LeveledItemEntry();
-                potionRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
-                potionRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
-                potionRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
-                potionGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                potionGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
-                state.PatchMod.Globals.Set(potionGlobals[l]);
-                potionRecipeLVLIs[i].Global = potionGlobals[l];
-                potionRecipeLVLIs[l].EditorID = "potionRecipeList" + l;
-                potionRecipeLVLIentriesdata[l].Reference = potionRecipeLVLIs[l].FormKey;
-                potionRecipeLVLIentriesdata[l].Level = 1;
-                potionRecipeLVLIentriesdata[l].Count = 1;
-            }
-            LeveledItem[] poisonRecipeLVLIs = new LeveledItem[poisonRecipeListCount];
-            LeveledItemEntry[] poisonRecipeLVLIentries = new LeveledItemEntry[poisonRecipeListCount];
-            LeveledItemEntryData[] poisonRecipeLVLIentriesdata = new LeveledItemEntryData[poisonRecipeListCount];
-            GlobalInt[] poisonGlobals = new GlobalInt[poisonRecipeListCount];
-            for (int l = 0; l < poisonRecipeListCount; l++)
-            {
-                poisonRecipeLVLIentries[l] = new LeveledItemEntry();
-                poisonRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
-                poisonRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
-                poisonRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
-                poisonGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                poisonGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
-                state.PatchMod.Globals.Set(poisonGlobals[l]);
-                poisonRecipeLVLIs[i].Global = poisonGlobals[l];
-                poisonRecipeLVLIs[l].EditorID = "poisonRecipeList" + l;
-                poisonRecipeLVLIentriesdata[l].Reference = poisonRecipeLVLIs[l].FormKey;
-                poisonRecipeLVLIentriesdata[l].Level = 1;
-                poisonRecipeLVLIentriesdata[l].Count = 1;
-            }
-            LeveledItem[] impurepotionRecipeLVLIs = new LeveledItem[impurepotionRecipeListCount];
-            LeveledItemEntry[] impurepotionRecipeLVLIentries = new LeveledItemEntry[impurepotionRecipeListCount];
-            LeveledItemEntryData[] impurepotionRecipeLVLIentriesdata = new LeveledItemEntryData[impurepotionRecipeListCount];
-            GlobalInt[] impurepotionGlobals = new GlobalInt[impurepotionRecipeListCount];
-            for (int l = 0; l < impurepotionRecipeListCount; l++)
-            {
-                impurepotionRecipeLVLIentries[l] = new LeveledItemEntry();
-                impurepotionRecipeLVLIentriesdata[l] = new LeveledItemEntryData();
-                impurepotionRecipeLVLIs[l] = state.PatchMod.LeveledItems.AddNew();
-                impurepotionRecipeLVLIs[l].Entries = new Noggog.ExtendedList<LeveledItemEntry>();
-                impurepotionGlobals[l] = new GlobalInt(state.PatchMod.GetNextFormKey(), SkyrimRelease.SkyrimSE);
-                impurepotionGlobals[l].Data = new Random().Next(5, 25);//Chance of picking a recipe from this list
-                state.PatchMod.Globals.Set(impurepotionGlobals[l]);
-                impurepotionRecipeLVLIs[i].Global = impurepotionGlobals[l];
-                impurepotionRecipeLVLIs[l].EditorID = "impurepotionRecipeList" + l;
-                impurepotionRecipeLVLIentriesdata[l].Reference = impurepotionRecipeLVLIs[l].FormKey;
-                impurepotionRecipeLVLIentriesdata[l].Level = 1;
-                impurepotionRecipeLVLIentriesdata[l].Count = 1;
-            }
-            Console.WriteLine("Splitting potions into lists (" + potionRecipeListCount + " " + poisonRecipeListCount + " " + impurepotionRecipeListCount + ")");
-            uint potionIndex = 0, poisonIndex = 0, impurepotionIndex = 0;
             Dictionary<string, int> nameCache = new Dictionary<string, int>();
+            int RecipeMakeCount = 0, splitIndex = Combinations.Count / (int)Config?.ESPCount!, splitIndexCount = 0;
+            if (Config?.RecipePercentage < 100)
+            {
+                Combinations.Shuffle();
+                int count = Combinations.Count;
+                int percentOfCombinations = (int)(count * (double)(0.01 * Config?.RecipePercentage!));
+                Combinations.RemoveRange(percentOfCombinations, count - percentOfCombinations);
+                Percent = (int)(Combinations.Count * Config?.OutputPercentage!);
+                splitIndex = Combinations.Count / (int)Config?.ESPCount!;
+            }
             foreach (IngredientCombination ic in Combinations)
             {
                 if (i % Percent == 0)
                     Console.WriteLine(i + " out of " + Combinations.Count + " recipes created.");
                 IBook newRecipe = noteTemplate.DeepCopy();
-                newRecipe.FormKey = state.PatchMod.GetNextFormKey();
+                RecipeMakeCount++;
+                if (RecipeMakeCount > (splitIndex + splitIndexCount))
+                    splitIndexCount += splitIndex;
+                int modIndex = splitIndexCount / splitIndex;
+                if (modIndex > Config?.ESPCount - 1)
+                    modIndex = ((int)Config?.ESPCount!) - 1;
+                newRecipe.FormKey = mods[modIndex].GetNextFormKey();
                 string prefix = "[Potion]";
                 if (ic.Type == 1)
                     prefix = "[Poison]";
@@ -267,21 +322,21 @@ namespace AddNewRecipes
                                     continue;
                                 }
                                 int[,] ingredientEffectIndex = new int[3, 4];
-                                for (int j = 0; j < ingredientEffectIndex.GetLength(0); j++)
-                                    for (int k = 0; k < ingredientEffectIndex.GetLength(1); k++)
-                                        ingredientEffectIndex[j, k] = -1;
-                                for (int j = 0; j < ic.MyIngredients.Length; j++)
+                                for (int m = 0; m < ingredientEffectIndex.GetLength(0); m++)
+                                    for (int n = 0; n < ingredientEffectIndex.GetLength(1); n++)
+                                        ingredientEffectIndex[m, n] = -1;
+                                for (int m = 0; m < ic.MyIngredients.Length; m++)
                                 {
                                     int offset = 0;
-                                    for (int k = 0; k < ic.MyIngredients[j].Effects.Count; k++)
+                                    for (int n = 0; n < ic.MyIngredients[m].Effects.Count; n++)
                                     {
                                         foreach (FormKey mgefformkey in ic.MyEffectsKeys!)
                                         {
-                                            if (ic.MyIngredients[j].Effects[k] == null)
+                                            if (ic.MyIngredients[m].Effects[n] == null)
                                                 continue;
-                                            if (ic.MyIngredients[j].Effects[k].BaseEffect.FormKey.Equals(mgefformkey))
+                                            if (ic.MyIngredients[m].Effects[n].BaseEffect.FormKey.Equals(mgefformkey))
                                             {
-                                                ingredientEffectIndex[j, offset++] = k;
+                                                ingredientEffectIndex[m, offset++] = n;
                                             }
                                         }
                                     }
@@ -302,53 +357,53 @@ namespace AddNewRecipes
                                             break;
                                         case "NoValueAfterRead":
                                             sp.Flags = ScriptProperty.Flag.Edited;
-                                            ((ScriptBoolProperty)sp).Data = (bool)Config?.HasValueAfterRead!;
+                                            ((ScriptBoolProperty)sp).Data = !(bool)Config?.HasValueAfterRead!;
                                             noValueAfterReadExists = true;
                                             break;
                                         case "CACO_AlchemyRecipesRead":
                                             alchemyRecipesReadExists = true;
                                             break;
                                     }
-                                    for (int j = 0; j < 3; j++)
-                                        if (sp.Name.Equals("Ingredient0" + (j + 1)))
-                                            if (ic.MyIngredients.Length > j)
+                                    for (int m = 0; m < 3; m++)
+                                        if (sp.Name.Equals("Ingredient0" + (m + 1)))
+                                            if (ic.MyIngredients.Length > m)
                                             {
                                                 sp.Flags = ScriptProperty.Flag.Edited;
-                                                ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngredients[j].FormKey);
-                                                ingredientExist[j] = true;
+                                                ((ScriptObjectProperty)sp).Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngredients[m].FormKey);
+                                                ingredientExist[m] = true;
                                             }
                                             else
                                                 se.Properties.Remove(sp);
-                                    for (int j = 0; j < 3; j++)
-                                        for (int k = 0; k < 4; k++)
-                                            if (sp.Name.Equals("Ingredient0" + (j + 1) + "Effect" + (k + 1)))
-                                                if (ingredientEffectIndex[j, k] != -1)
+                                    for (int m = 0; m < 3; m++)
+                                        for (int n = 0; n < 4; n++)
+                                            if (sp.Name.Equals("Ingredient0" + (m + 1) + "Effect" + (n + 1)))
+                                                if (ingredientEffectIndex[m, n] != -1)
                                                 {
                                                     sp.Flags = ScriptProperty.Flag.Edited;
-                                                    ((ScriptIntProperty)sp).Data = ingredientEffectIndex[j, k];
-                                                    ingredientEffectExist[j, k] = true;
+                                                    ((ScriptIntProperty)sp).Data = ingredientEffectIndex[m, n];
+                                                    ingredientEffectExist[m, n] = true;
                                                 }
                                                 else
                                                     se.Properties.Remove(sp);
                                 }
-                                for (int j = 0; j < ingredientExist.Length; j++)
-                                    if (ic.MyIngredients.Length > j)
-                                        if (!ingredientExist[j])
+                                for (int m = 0; m < ingredientExist.Length; m++)
+                                    if (ic.MyIngredients.Length > m)
+                                        if (!ingredientExist[m])
                                         {
                                             ScriptObjectProperty sop = new ScriptObjectProperty();
-                                            sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngredients[j].FormKey);
-                                            sop.Name = "Ingredient0" + (j + 1);
+                                            sop.Object = new FormLink<ISkyrimMajorRecordGetter>(ic.MyIngredients[m].FormKey);
+                                            sop.Name = "Ingredient0" + (m + 1);
                                             sop.Flags = ScriptProperty.Flag.Edited;
                                             se.Properties.Add(sop);
                                         }
-                                for (int j = 0; j < 3; j++)
-                                    for (int k = 0; k < 4; k++)
-                                        if (ic.MyIngredients.Length > j)
-                                            if (!ingredientEffectExist[j, k] && ingredientEffectIndex[j, k] != -1)
+                                for (int m = 0; m < 3; m++)
+                                    for (int n = 0; n < 4; n++)
+                                        if (ic.MyIngredients.Length > m)
+                                            if (!ingredientEffectExist[m, n] && ingredientEffectIndex[m, n] != -1)
                                             {
                                                 ScriptIntProperty sip = new ScriptIntProperty();
-                                                sip.Data = ingredientEffectIndex[j, k];
-                                                sip.Name = "Ingredient0" + (j + 1) + "Effect" + (k + 1);
+                                                sip.Data = ingredientEffectIndex[m, n];
+                                                sip.Name = "Ingredient0" + (m + 1) + "Effect" + (n + 1);
                                                 sip.Flags = ScriptProperty.Flag.Edited;
                                                 se.Properties.Add(sip);
                                             }
@@ -382,7 +437,7 @@ namespace AddNewRecipes
                     }
                 }
 
-                state.PatchMod.Books.Set((Book)newRecipe);
+                mods[modIndex].Books.Set((Book)newRecipe);
                 LeveledItemEntry lie = new LeveledItemEntry();
                 LeveledItemEntryData data = new LeveledItemEntryData();
                 data.Level = 1;
@@ -393,22 +448,22 @@ namespace AddNewRecipes
                 {
 
                     case 0:
-                        potionRecipeLVLIentriesdata[potionIndex / 128].Reference = potionRecipeLVLIs[potionIndex / 128].FormKey;
-                        potionRecipeLVLIentries[potionIndex / 128].Data = potionRecipeLVLIentriesdata[potionIndex / 128];
-                        potionRecipeLVLIs[potionIndex / 128].Entries?.Add(lie);
-                        potionIndex++;
+                        potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / 128].Reference = potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / 128].FormKey;
+                        potionRecipeLVLIentries.ElementAt(modIndex)[potionIndex[modIndex] / 128].Data = potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / 128];
+                        potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / 128].Entries?.Add(lie);
+                        potionIndex[modIndex]++;
                         break;
                     case 1:
-                        poisonRecipeLVLIentriesdata[poisonIndex / 128].Reference = poisonRecipeLVLIs[poisonIndex / 128].FormKey;
-                        poisonRecipeLVLIentries[poisonIndex / 128].Data = poisonRecipeLVLIentriesdata[poisonIndex / 128];
-                        poisonRecipeLVLIs[poisonIndex / 128].Entries?.Add(lie);
-                        poisonIndex++;
+                        poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Reference = poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / 128].FormKey;
+                        poisonRecipeLVLIentries.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Data = poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / 128 ];
+                        poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Entries?.Add(lie);
+                        poisonIndex[modIndex]++;
                         break;
                     case 2:
-                        impurepotionRecipeLVLIentriesdata[impurepotionIndex / 128].Reference = impurepotionRecipeLVLIs[impurepotionIndex / 128].FormKey;
-                        impurepotionRecipeLVLIentries[impurepotionIndex / 128].Data = impurepotionRecipeLVLIentriesdata[impurepotionIndex / 128];
-                        impurepotionRecipeLVLIs[impurepotionIndex / 128].Entries?.Add(lie);
-                        impurepotionIndex++;
+                        impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Reference = impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].FormKey;
+                        impurepotionRecipeLVLIentries.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Data = impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128];
+                        impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Entries?.Add(lie);
+                        impurepotionIndex[modIndex]++;
                         break;
                 }
                 i++;
@@ -417,53 +472,109 @@ namespace AddNewRecipes
             Console.WriteLine("Linking recipes to potion leveled list");
             IEnumerable<ILeveledItemGetter> lvlilists = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().LeveledItem().WinningOverrides() where list.EditorID?.Equals("LItemPotionAll") == true select list;
             ILeveledItemGetter allList = lvlilists.ToList()[0];
-            LeveledItem modifiedList = state.PatchMod.LeveledItems.GetOrAddAsOverride(allList);
-            potionIndex = 0;
-            poisonIndex = 0;
-            impurepotionIndex = 0;
-            for (int l = 0; l < masterpotionRecipeListCount; l++)
-            {
-                masterpotionRecipeLVLIentriesdata[l].Reference = masterpotionRecipeLVLIs[l].FormKey;
-                masterpotionRecipeLVLIentries[l].Data = masterpotionRecipeLVLIentriesdata[l];
-                for (int k = 0; k < 128; k++)
-                {
-                    if (potionIndex < potionRecipeLVLIentries.Length)
-                        masterpotionRecipeLVLIs[l].Entries?.Add(potionRecipeLVLIentries[potionIndex++]);
-                    else if (poisonIndex < poisonRecipeLVLIentries.Length)
-                        masterpotionRecipeLVLIs[l].Entries?.Add(poisonRecipeLVLIentries[poisonIndex++]);
-                    else if (impurepotionIndex < impurepotionRecipeLVLIentries.Length)
-                        masterpotionRecipeLVLIs[l].Entries?.Add(impurepotionRecipeLVLIentries[impurepotionIndex++]);
-                    else
-                        break;
-                }
-                mainpotionRecipeLVLI.Entries?.Add(masterpotionRecipeLVLIentries[l]);
-            }
-            foreach (LeveledItem li in potionRecipeLVLIs)
-                state.PatchMod.LeveledItems.Set(li);
-            foreach (LeveledItem li in poisonRecipeLVLIs)
-                state.PatchMod.LeveledItems.Set(li);
-            foreach (LeveledItem li in impurepotionRecipeLVLIs)
-                state.PatchMod.LeveledItems.Set(li);
-            foreach (LeveledItem li in masterpotionRecipeLVLIs)
-                state.PatchMod.LeveledItems.Set(li);
+            LeveledItem modifiedList = mods[0].LeveledItems.GetOrAddAsOverride(allList);
 
-            mainpotionRecipeLVLIentrydata.Reference = mainpotionRecipeLVLI.FormKey;
-            mainpotionRecipeLVLIentry.Data = mainpotionRecipeLVLIentrydata;
-            mainpotionRecipeLVLIentrydata.Count = 1;
-            mainpotionRecipeLVLIentrydata.Level = 1;
-            modifiedList.Entries?.Add(mainpotionRecipeLVLIentry);
-            state.PatchMod.LeveledItems.Set(mainpotionRecipeLVLI);
-            Console.WriteLine("Adding recipes to defined containers");
-            IEnumerable<IContainerGetter> chests = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().Container().WinningOverrides() where ContainerEditorIDs?.ToList().Contains(list.EditorID!) == true select list;
-            ContainerEntry potionListContainerEntry = new ContainerEntry();
-            ContainerItem potionListContainerItem = new ContainerItem();
-            potionListContainerItem.Item = mainpotionRecipeLVLI.FormKey;
-            potionListContainerItem.Count = 1;
-            potionListContainerEntry.Item = potionListContainerItem;
-            foreach (IContainerGetter chest in chests)
+            int addCount = 0;
+            
+            for (int j = 0; j < mods.Length; j++)
             {
-                Container rChest = state.PatchMod.Containers.GetOrAddAsOverride(chest);
-                rChest.Items?.Add(potionListContainerEntry);
+                uint potionIndex1 = 0;
+                uint poisonIndex1 = 0;
+                uint impurepotionIndex1 = 0;
+                for (int l = 0; l < masterpotionRecipeListCount[j]; l++)
+                {
+                    masterpotionRecipeLVLIentriesdata.ElementAt(j)[l].Reference = masterpotionRecipeLVLIs.ElementAt(j)[l].FormKey;
+                    masterpotionRecipeLVLIentries.ElementAt(j)[l].Data = masterpotionRecipeLVLIentriesdata.ElementAt(j)[l];
+                    for (int k = 0; k < 128; k++)
+                    {
+                        if (potionIndex1 < potionRecipeLVLIentries.ElementAt(j).Length)
+                            masterpotionRecipeLVLIs.ElementAt(j)[l].Entries?.Add(potionRecipeLVLIentries.ElementAt(j)[potionIndex1++]);
+                        else if (poisonIndex1 < poisonRecipeLVLIentries.ElementAt(j).Length)
+                            masterpotionRecipeLVLIs.ElementAt(j)[l].Entries?.Add(poisonRecipeLVLIentries.ElementAt(j)[poisonIndex1++]);
+                        else if (impurepotionIndex1 < impurepotionRecipeLVLIentries.ElementAt(j).Length)
+                            masterpotionRecipeLVLIs.ElementAt(j)[l].Entries?.Add(impurepotionRecipeLVLIentries.ElementAt(j)[impurepotionIndex1++]);
+                        else
+                            break;
+                    }
+                    mainpotionRecipeLVLI[j].Entries?.Add(masterpotionRecipeLVLIentries.ElementAt(j)[l]);
+                }
+                for (int l = 0; l < potionRecipeLVLIs.ElementAt(j).Length; l++)
+                {
+                    LeveledItem li = potionRecipeLVLIs.ElementAt(j)[l];
+                    splitIndexCount = addCount / splitIndex;
+                    if (addCount > (splitIndex + splitIndexCount))
+                        splitIndexCount += splitIndex;
+                    int modIndex = splitIndexCount / splitIndex;
+                    if (modIndex > Config?.ESPCount - 1)
+                        modIndex = ((int)Config?.ESPCount!) - 1;
+                    mods[modIndex].LeveledItems.Set(li);
+                    addCount++;
+                }
+                for (int l = 0; l < poisonRecipeLVLIs.ElementAt(j).Length; l++)
+                {
+                    LeveledItem li = poisonRecipeLVLIs.ElementAt(j)[l];
+                    splitIndexCount = addCount / splitIndex;
+                    if (addCount > (splitIndex + splitIndexCount))
+                        splitIndexCount += splitIndex;
+                    int modIndex = splitIndexCount / splitIndex;
+                    if (modIndex > Config?.ESPCount - 1)
+                        modIndex = ((int)Config?.ESPCount!) - 1;
+                    mods[modIndex].LeveledItems.Set(li);
+                    addCount++;
+                }
+                for (int l = 0; l < impurepotionRecipeLVLIs.ElementAt(j).Length; l++)
+                {
+                    LeveledItem li = impurepotionRecipeLVLIs.ElementAt(j)[l];
+                    splitIndexCount = addCount / splitIndex;
+                    if (addCount > (splitIndex + splitIndexCount))
+                        splitIndexCount += splitIndex;
+                    int modIndex = splitIndexCount / splitIndex;
+                    if (modIndex > Config?.ESPCount - 1)
+                        modIndex = ((int)Config?.ESPCount!) - 1;
+                    mods[modIndex].LeveledItems.Set(li);
+                    addCount++;
+                }
+                for (int l = 0; l < masterpotionRecipeLVLIs.ElementAt(j).Length; l++)
+                {
+                    LeveledItem li = masterpotionRecipeLVLIs.ElementAt(j)[l];
+                    splitIndexCount = addCount / splitIndex;
+                    if (addCount > (splitIndex + splitIndexCount))
+                        splitIndexCount += splitIndex;
+                    int modIndex = splitIndexCount / splitIndex;
+                    if (modIndex > Config?.ESPCount - 1)
+                        modIndex = ((int)Config?.ESPCount!) - 1;
+                    mods[modIndex].LeveledItems.Set(li);
+                    addCount++;
+                }
+
+                for (int k = 0; k < mainpotionRecipeLVLI.Length; k++)
+                {
+                    mainpotionRecipeLVLIentrydata[k].Reference = mainpotionRecipeLVLI[k].FormKey;
+                    mainpotionRecipeLVLIentry[k].Data = mainpotionRecipeLVLIentrydata[k];
+                    mainpotionRecipeLVLIentrydata[k].Count = 1;
+                    mainpotionRecipeLVLIentrydata[k].Level = 1;
+                    modifiedList.Entries?.Add(mainpotionRecipeLVLIentry[k]);
+                    mods[k].LeveledItems.Set(mainpotionRecipeLVLI[k]);
+                }
+
+                Console.WriteLine("Adding recipes to defined containers");
+                IEnumerable<IContainerGetter> chests = from list in state.LoadOrder.PriorityOrder.OnlyEnabled().Container().WinningOverrides() where ContainerEditorIDs?.ToList().Contains(list.EditorID!) == true select list;
+                ContainerEntry potionListContainerEntry = new ContainerEntry();
+                ContainerItem potionListContainerItem = new ContainerItem();
+                potionListContainerItem.Item = mainpotionRecipeLVLI[j].FormKey;
+                potionListContainerItem.Count = 1;
+                potionListContainerEntry.Item = potionListContainerItem;
+                foreach (IContainerGetter chest in chests)
+                {
+                    Container rChest = mods[0].Containers.GetOrAddAsOverride(chest);
+                    rChest.Items?.Add(potionListContainerEntry);
+                }
+            }
+            for (int u = 0; u < mods.Length; u++)
+            {
+                Console.WriteLine("Writing ESP " + Config?.ESPPath! + modkeys[u].FileName);
+                SkyrimMod mod = mods[u];
+                mod.WriteToBinary(Config?.ESPPath! + modkeys[u].FileName);
             }
         }
     }
@@ -552,9 +663,10 @@ namespace AddNewRecipes
                         type = 1;
                         if (mgeflist.Count <= Program.Config?.PoisonSkipThreshold)
                             continue;
-                        Program.OurMutex.WaitOne();
+                        Program.OurMutex2.WaitOne();
                         Program.PoisonRecipeCount++;
-                        Program.OurMutex.ReleaseMutex();
+                        Program.OurMutex2.ReleaseMutex();
+
                     }
                     else if (mgeflistD.Contains(true))//Check if effects match poison and potion
                     {
@@ -562,17 +674,17 @@ namespace AddNewRecipes
                         type = 2;
                         if (mgeflist.Count <= Program.Config?.ImpureSkipThreshold)
                             continue;
-                        Program.OurMutex.WaitOne();
+                        Program.OurMutex2.WaitOne();
                         Program.ImpurepotionRecipeCount++;
-                        Program.OurMutex.ReleaseMutex();
+                        Program.OurMutex2.ReleaseMutex();
                     }
                     else
                     {
                         if (mgeflist.Count <= Program.Config?.PotionSkipThreshold)
                             continue;
-                        Program.OurMutex.WaitOne();
+                        Program.OurMutex2.WaitOne();
                         Program.PotionRecipeCount++;
-                        Program.OurMutex.ReleaseMutex();
+                        Program.OurMutex2.ReleaseMutex();
                     }
                     potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
                     string potionName = "Recipe: ";//Define recipe name
@@ -650,9 +762,9 @@ namespace AddNewRecipes
                             type = 1;
                             if (mgeflist.Count <= Program.Config?.PoisonSkipThreshold)
                                 continue;
-                            Program.OurMutex.WaitOne();
+                            Program.OurMutex2.WaitOne();
                             Program.PoisonRecipeCount++;
-                            Program.OurMutex.ReleaseMutex();
+                            Program.OurMutex2.ReleaseMutex();
                         }
                         else if (mgeflistD.Contains(true))//Check if effects match poison and potion
                         {
@@ -660,17 +772,17 @@ namespace AddNewRecipes
                             type = 2;
                             if (mgeflist.Count <= Program.Config?.ImpureSkipThreshold)
                                 continue;
-                            Program.OurMutex.WaitOne();
+                            Program.OurMutex2.WaitOne();
                             Program.ImpurepotionRecipeCount++;
-                            Program.OurMutex.ReleaseMutex();
+                            Program.OurMutex2.ReleaseMutex();
                         }
                         else
                         {
                             if (mgeflist.Count <= Program.Config?.PotionSkipThreshold)
                                 continue;
-                            Program.OurMutex.WaitOne();
+                            Program.OurMutex2.WaitOne();
                             Program.PotionRecipeCount++;
-                            Program.OurMutex.ReleaseMutex();
+                            Program.OurMutex2.ReleaseMutex();
                         }
                         potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
                         string potionName = "Recipe: ";
@@ -706,18 +818,37 @@ namespace AddNewRecipes
                 Program.OurMutex.ReleaseMutex();
             }
         }
-        private static IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
+        private IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
-            List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
-            return (from matchingEffects in otherIngredients.ToList() where (firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey)) select matchingEffects).ToArray();
+            List<IIngredientGetter> matchingIngredients = new List<IIngredientGetter>();
+            List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
 
+            //return (from matchingEffects in otherIngredients.ToList() where (firstIngredientEffects.Intersect(matchingEffects.Effects.ToList()).Any()) && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey)) select matchingEffects).ToArray();
+            foreach (IIngredientGetter ieg in otherIngredients)
+            {
+                List<FormKey> otherIngredientEffectKeys = getEffectFormKeys(ieg);
+                if (otherIngredientEffectKeys.Intersect(firstIngredientEffectKeys).Any())
+                    matchingIngredients.Add(ieg);
+            }
+            return matchingIngredients.ToArray();
         }
 
-        private static IIngredientGetter[] getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
+        private IIngredientGetter[] getIngredientsMatchingTwoIngredients(IIngredientGetter firstIngredient, IIngredientGetter secondIngredient, IEnumerable<IIngredientGetter> otherIngredients)
         {
-            List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
-            List<IEffectGetter> secondIngredientEffects = secondIngredient.Effects.ToList();
-            return (from matchingEffects in otherIngredients.ToList() where ((firstIngredientEffects.Intersect(matchingEffects.Effects).Any() || firstIngredientEffects.Intersect(secondIngredientEffects).Any()) && (secondIngredientEffects.Intersect(matchingEffects.Effects).Any() || secondIngredientEffects.Intersect(matchingEffects.Effects).Any())  && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey) && !secondIngredient.FormKey.Equals(matchingEffects.FormKey) && !firstIngredient.FormKey.Equals(secondIngredient.FormKey))) select matchingEffects).ToArray();
+            //    List<IEffectGetter> firstIngredientEffects = firstIngredient.Effects.ToList();
+            //    List<IEffectGetter> secondIngredientEffects = secondIngredient.Effects.ToList();
+            //    return (from matchingEffects in otherIngredients.ToList() where ((firstIngredientEffects.Intersect(matchingEffects.Effects).Any() || firstIngredientEffects.Intersect(secondIngredientEffects).Any()) && (secondIngredientEffects.Intersect(matchingEffects.Effects).Any() || secondIngredientEffects.Intersect(matchingEffects.Effects).Any())  && (!firstIngredient.FormKey.Equals(matchingEffects.FormKey) && !secondIngredient.FormKey.Equals(matchingEffects.FormKey) && !firstIngredient.FormKey.Equals(secondIngredient.FormKey))) select matchingEffects).ToArray();
+            otherIngredients = from otherIngredient in otherIngredients where !secondIngredient.FormKey.Equals(firstIngredient.FormKey) && !otherIngredient.FormKey.Equals(secondIngredient.FormKey) && !otherIngredient.FormKey.Equals(firstIngredient.FormKey) select otherIngredient;
+            List<IIngredientGetter> matchingIngredients = new List<IIngredientGetter>();
+            List<FormKey> firstIngredientEffectKeys = getEffectFormKeys(firstIngredient);
+            List<FormKey> secondIngredientEffectKeys = getEffectFormKeys(secondIngredient);
+            foreach (IIngredientGetter ieg in otherIngredients)
+            {
+                List<FormKey> otherIngredientEffectKeys = getEffectFormKeys(ieg);
+                if ((firstIngredientEffectKeys.Intersect(secondIngredientEffectKeys).Any() || firstIngredientEffectKeys.Intersect(otherIngredientEffectKeys).Any()) && (secondIngredientEffectKeys.Intersect(firstIngredientEffectKeys).Any() || secondIngredientEffectKeys.Intersect(otherIngredientEffectKeys).Any()) && (otherIngredientEffectKeys.Intersect(firstIngredientEffectKeys).Any() || otherIngredientEffectKeys.Intersect(secondIngredientEffectKeys).Any()))
+                    matchingIngredients.Add(ieg);
+            }
+            return matchingIngredients.ToArray();
         }
 
         //private IIngredientGetter[] getIngredientsMatchingOneIngredient(IIngredientGetter firstIngredient, IEnumerable<IIngredientGetter> otherIngredients)
@@ -769,6 +900,18 @@ static class Extensions
     {
         return new PartitionHelper<IIngredientGetter>(items, partitionSize);
     }
+    public static void Shuffle<T>(this IList<T> list)//Uwe Keim stackoverflow
+    {
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = ThreadSafeRandom.ThisThreadsRandom.Next(n + 1);
+            T value = list[k];
+            list[k] = list[n];
+            list[n] = value;
+        }
+    }
     private sealed class PartitionHelper<IIngredientGetter> : IEnumerable<IEnumerable<IIngredientGetter>>
     {
         readonly IEnumerable<IIngredientGetter> items;
@@ -805,6 +948,15 @@ static class Extensions
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+    }
+    public static class ThreadSafeRandom
+    {
+        [ThreadStatic] private static Random? Local;
+
+        public static Random ThisThreadsRandom
+        {
+            get { return Local ?? (Local = new Random(unchecked(Environment.TickCount * 31 + Thread.CurrentThread.ManagedThreadId))); }
         }
     }
 }
