@@ -65,12 +65,12 @@ namespace AddNewRecipes
             SkyrimMod[] mods = new SkyrimMod[(int)Config?.ESPCount!];
             for (int u = 0; u < Config?.ESPCount; u++)
             {
-                modkeys[u] = new ModKey("AddNewRecipe-" + u, ModType.Plugin);
+                modkeys[u] = new ModKey("AddNewRecipes-" + u, ModType.Plugin);
                 mods[u] = new SkyrimMod(modkeys[u], SkyrimRelease.SkyrimSE);
             }
             ContainerEditorIDs = new HashSet<string>(Config?.ContainerEditorIds!);
             BadKeywordsF = (from keyword in state.LoadOrder.PriorityOrder.OnlyEnabled().Keyword().WinningOverrides() where BadKeywords.Contains(keyword.EditorID) select (IFormLink<IKeyword>)(new FormLink<IKeyword>(keyword.FormKey))).ToList();
-            IEnumerable<IIngredientGetter> ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides().Where(x => !Config.SkipPlugins.Contains(x.FormKey.ModKey.Name.ToLower())).Where(x => (!Config.SkipIngredients.Intersect(x.Name?.ToString()?.Split()!).Any() || Config.SkipIngredients.Contains(x.Name?.ToString()!))).Where(x => !String.IsNullOrEmpty(x.EditorID)).ToList();
+            IEnumerable<IIngredientGetter> ingredients = state.LoadOrder.PriorityOrder.OnlyEnabled().Ingredient().WinningOverrides().Where(x => !Config?.SkipPlugins.Contains(x.FormKey.ModKey.Name.ToLower()) == true).Where(x => (!Config?.SkipIngredients.Intersect(x.Name?.ToString()?.Split()!).Any() == true || Config?.SkipIngredients.Contains(x.Name?.ToString()!) == true)).Where(x => !String.IsNullOrEmpty(x.EditorID)).ToList();
             AllIngredients = ingredients;
             Percent = (int)(ingredients.Count() * Config?.OutputPercentage!);
             TotalIngredientCount = ingredients.Count();
@@ -117,7 +117,7 @@ namespace AddNewRecipes
             Console.WriteLine("Creating Leveled lists...");
             IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
             IBookGetter noteTemplate = books.ToList()[0];
-            Console.WriteLine("Creating " + Combinations.Count + " recipes.");
+            Console.WriteLine("Processing " + Combinations.Count + " recipes.");
             Percent = (int)(Combinations.Count * Config?.OutputPercentage!);
             int i = 0;
             /* Main leveled list that gets added to recipe drop */
@@ -249,9 +249,10 @@ namespace AddNewRecipes
             }
             Dictionary<string, int> nameCache = new Dictionary<string, int>();
             int RecipeMakeCount = 0, splitIndex = Combinations.Count / (int)Config?.ESPCount!, splitIndexCount = 0;
+            if(Config?.RandomizeList == true)
+                Combinations.Shuffle();
             if (Config?.RecipePercentage < 100)
             {
-                Combinations.Shuffle();
                 int count = Combinations.Count;
                 int percentOfCombinations = (int)(count * (double)(0.01 * Config?.RecipePercentage!));
                 Combinations.RemoveRange(percentOfCombinations, count - percentOfCombinations);
@@ -261,7 +262,7 @@ namespace AddNewRecipes
             foreach (IngredientCombination ic in Combinations)
             {
                 if (i % Percent == 0)
-                    Console.WriteLine(i + " out of " + Combinations.Count + " recipes created.");
+                    Console.WriteLine(i + " out of " + Combinations.Count + " recipes processed.");
                 IBook newRecipe = noteTemplate.DeepCopy();
                 RecipeMakeCount++;
                 if (RecipeMakeCount > (splitIndex + splitIndexCount))
@@ -287,6 +288,12 @@ namespace AddNewRecipes
                 int nameIndex = 0;
                 if (nameCache.TryGetValue(name, out nameIndex))
                 {
+                    if (nameIndex > Config?.MaxPotionTypeCount)
+                    {
+                        RecipeMakeCount--;
+                        i++;
+                        continue;
+                    }
                     nameCache[name] = nameIndex + 1;
                     name = name + nameCache[name];
                 }
@@ -570,6 +577,7 @@ namespace AddNewRecipes
                     rChest.Items?.Add(potionListContainerEntry);
                 }
             }
+            Console.WriteLine("Writing " + RecipeMakeCount + " recipes to file.");
             for (int u = 0; u < mods.Length; u++)
             {
                 Console.WriteLine("Writing ESP " + Config?.ESPPath! + modkeys[u].FileName);
@@ -649,8 +657,8 @@ namespace AddNewRecipes
                         state.LinkCache.TryResolve<IMagicEffectGetter>(formkeysA[n], out var mgeffect);
                         mgeflist.Add(mgeffect?.Name?.String);
                         mgeflists.AddRange(mgeffect?.Name?.String?.Split()!);
-                        IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect.Keywords;
-                        if (mgeffect.Flags.HasFlag(MagicEffect.Flag.Detrimental) || mgeffect.Flags.HasFlag(MagicEffect.Flag.Hostile) && (thisKeywords?.Intersect(Program.BadKeywordsF!).Any() == true))
+                        IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect?.Keywords;
+                        if (mgeffect?.Flags.HasFlag(MagicEffect.Flag.Detrimental) == true || mgeffect?.Flags.HasFlag(MagicEffect.Flag.Hostile) == true && (thisKeywords?.Intersect(Program.BadKeywordsF!).Any() == true))
                             mgeflistD.Add(true);
                         else
                             mgeflistD.Add(false);
@@ -748,8 +756,8 @@ namespace AddNewRecipes
                             state.LinkCache.TryResolve<IMagicEffectGetter>(formkeysA[n], out var mgeffect);
                             mgeflist.Add(mgeffect?.Name?.String);
                             mgeflists.AddRange(mgeffect?.Name?.String?.Split()!);
-                            IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect.Keywords;
-                            if (mgeffect.Flags.HasFlag(MagicEffect.Flag.Detrimental) || mgeffect.Flags.HasFlag(MagicEffect.Flag.Hostile) && (thisKeywords?.Intersect(Program.BadKeywordsF!).Any() == true))
+                            IReadOnlyList<IFormLink<IKeywordGetter>>? thisKeywords = mgeffect?.Keywords;
+                            if (mgeffect?.Flags.HasFlag(MagicEffect.Flag.Detrimental) == true || mgeffect?.Flags.HasFlag(MagicEffect.Flag.Hostile) == true && (thisKeywords?.Intersect(Program.BadKeywordsF!).Any() == true))
                                 mgeflistD.Add(true);
                             else
                                 mgeflistD.Add(false);

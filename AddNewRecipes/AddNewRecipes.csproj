@@ -3,10 +3,11 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
     <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+	<Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Mutagen.Bethesda" Version="0.26.4" />
-    <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.16.8" />
+    <PackageReference Include="Mutagen.Bethesda" Version="0.26.6" />
+    <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.16.12" />
   </ItemGroup>
 </Project>

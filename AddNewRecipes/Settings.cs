@@ -17,8 +17,10 @@ namespace AddNewRecipes
         public int MinChance = 5;
         public int MaxChance = 25;
         public List<String> ContainerEditorIds = new List<string> { "TreasBanditChest", "TreasDraugrChest" };
-        public double OutputPercentage = 0.05;
+        public bool RandomizeList = false;
         public int RecipePercentage = 100;
+        public int MaxPotionTypeCount = 50000;
+        public double OutputPercentage = 0.05;
         public int WorkerThreadCount = 4;
         public int ESPCount = 1;
         public string ESPPath = "./"; 
