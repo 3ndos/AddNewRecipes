@@ -14,6 +14,7 @@ namespace AddNewRecipes
         public uint RecipeValue = 250;
         public bool LearnEffectsFromRecipe = true;
         public bool HasValueAfterRead = true;
+        public bool MinimalRecipeText = false;
         public int MinChance = 5;
         public int MaxChance = 25;
         public List<String> ContainerEditorIds = new List<string> { "TreasBanditChest", "TreasDraugrChest" };

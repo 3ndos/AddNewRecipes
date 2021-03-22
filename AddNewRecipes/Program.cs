@@ -644,7 +644,9 @@ namespace AddNewRecipes
                     FormKey[] formkeysA = formkeys.ToArray();
                     if (formkeysA.Length < 1)
                         continue;
-                    string potionString = "<font face='$HandwrittenFont'><font size='26'>";//Define main text for recipe
+                    string potionString = "";//Define main text for recipe
+                    if (Program.Config?.MinimalRecipeText == false)
+                        potionString += "<font face='$HandwrittenFont'><font size='26'>";
                     potionString += "-<b>" + (ingredient.Name + "<br><b>-<b>" + ingredient2.Name + "</b>");
 
                     List<string?> mgeflist = new List<string?>();
@@ -694,7 +696,10 @@ namespace AddNewRecipes
                         Program.PotionRecipeCount++;
                         Program.OurMutex2.ReleaseMutex();
                     }
-                    potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
+                    if(Program.Config?.MinimalRecipeText == false)
+                        potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
+                    else
+                        potionString += "<br>";
                     string potionName = "Recipe: ";//Define recipe name
                     for (int k = 0; k < mgeflist.Count; k++)
                     {
@@ -710,9 +715,11 @@ namespace AddNewRecipes
 
                     if (mgeflist.Count > 1)
                         sstring = "s";
-
-                    potionString += "<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring;
-                    potionString += "<\\font>";
+                    if (Program.Config?.MinimalRecipeText == false)
+                    {
+                        potionString += "<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring;
+                        potionString += "<\\font>";
+                    }
                     IIngredientGetter[] ingrss = { ingredient, ingredient2 };
                     Program.OurMutex.WaitOne();
                     IngredientCombination ingrcombo = new IngredientCombination(potionName, ingrss, mgeflist?.ToArray()!, baseEffectFormKeys.ToArray(), potionString, type);
@@ -744,7 +751,9 @@ namespace AddNewRecipes
                         FormKey[] formkeysA = formkeys.ToArray();
                         if (formkeysA.Length < 1)
                             continue;
-                        string potionString = "<font face='$HandwrittenFont'><font size='26'>";
+                        string potionString = "";//Define main text for recipe
+                        if (Program.Config?.MinimalRecipeText == false)
+                            potionString += "<font face='$HandwrittenFont'><font size='26'>";
                         potionString = "-<b>" + (ingredient.Name + "<br></b>-<b>" + ingredient2.Name + "<br></b>-<b>" + ingredient3.Name + "</b>");
                         List<string?> mgeflist = new List<string?>();
                         List<string?> mgeflists = new List<string?>();
@@ -792,7 +801,10 @@ namespace AddNewRecipes
                             Program.PotionRecipeCount++;
                             Program.OurMutex2.ReleaseMutex();
                         }
-                        potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
+                        if (Program.Config?.MinimalRecipeText == false)
+                            potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
+                        else
+                            potionString += "<br>";
                         string potionName = "Recipe: ";
                         for (int k = 0; k < mgeflist.Count; k++)
                         {
@@ -808,8 +820,11 @@ namespace AddNewRecipes
 
                         if (mgeflist.Count > 1)
                             sstring = "s";
-                        potionString += "<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring;
-                        potionString += "<\\font>";
+                        if (Program.Config?.MinimalRecipeText == false)
+                        {
+                            potionString += "<br></font><font size='14'> Contains " + mgeflist.Count + " Effect" + sstring;
+                            potionString += "<\\font>";
+                        }
                         IIngredientGetter[] ingrss = { ingredient, ingredient2, ingredient3 };
                         Program.OurMutex.WaitOne();
                         IngredientCombination ingrcombo = new IngredientCombination(potionName, ingrss, mgeflist?.ToArray()!, baseEffectFormKeys.ToArray(), potionString, type);
