@@ -36,7 +36,7 @@ namespace AddNewRecipes
         }
         private static string[] BadKeywords = { "MagicAlchHarmful" };
         public static List<IngredientCombination> Combinations = new List<IngredientCombination>();
-        public static Mutex OurMutex2 = new Mutex(), OurMutex = new Mutex();
+        public static Mutex OurMutex = new Mutex(), OurMutex2 = new Mutex();
         private static int Percent;
         public static bool FinishedProcessing;
         public static uint PotionRecipeCount, PoisonRecipeCount, ImpurepotionRecipeCount;
@@ -45,6 +45,7 @@ namespace AddNewRecipes
         public static Stopwatch StopWatch = new Stopwatch();
         public static IEnumerable<IFormLink<IKeyword>>? BadKeywordsF;
         public static Settings? Config = new Settings();
+        const uint LeveledListSize = 255;
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
         {
             try
@@ -111,8 +112,64 @@ namespace AddNewRecipes
             };
             Console.WriteLine("Terminating Threads.");
             for (int u = 0; u < Config?.WorkerThreadCount; u++)
-            {
                 threads[u].Join();
+            int RecipeMakeCount = 0, splitIndex = Combinations.Count / (int)Config?.ESPCount!, splitIndexCount = 0;
+            if (Config?.RandomizeList == true)
+            {
+                Console.WriteLine("Randomizing Recipe List.");
+                Combinations.Shuffle();
+            }
+            if (Config?.RecipePercentage < 100)
+            {
+                int count = Combinations.Count;
+                int percentOfCombinations = (int)(count * (double)(0.01 * Config?.RecipePercentage!));
+                Combinations.RemoveRange(percentOfCombinations, count - percentOfCombinations);
+                Percent = (int)(Combinations.Count * Config?.OutputPercentage!);
+                splitIndex = Combinations.Count / (int)Config?.ESPCount!;
+                Console.WriteLine("Reducing recipe list by " + Config?.RecipePercentage + "% ...");
+                Console.WriteLine(Config?.RecipePercentage! + "% of " + count + " is " + Combinations.Count);
+            }
+            Dictionary<string, int> nameCreateCache = new Dictionary<string, int>();
+            uint newListCount = 0, newPotionRecipeCount = 0, newPoisonRecipeCount = 0, newImpurepotionRecipeCount = 0;
+            List<IngredientCombination> tempCombinations = new List<IngredientCombination>();
+            foreach (IngredientCombination ic in Combinations)
+            {
+                string? name = "";
+                foreach (string? s in ic.MyEffects!)
+                    name += s;
+                name = name.Replace(" ", string.Empty);
+                int nameIndex = 0;
+                if (nameCreateCache.TryGetValue(name, out nameIndex))
+                {
+                    if (nameIndex <= Config?.MaxPotionTypeCount)
+                    {
+                        tempCombinations.Add(ic);
+                        newListCount++;
+                        switch(ic.Type)
+                        {
+                            case 0:
+                                newPotionRecipeCount++;
+                                break;
+                            case 1:
+                                newPoisonRecipeCount++;
+                                break;
+                            case 2:
+                                newImpurepotionRecipeCount++;
+                                break;
+                        }
+                    }
+                    nameCreateCache[name] = nameIndex + 1;
+                }
+                else
+                    nameCreateCache.Add(name, 0);
+            }
+            if (tempCombinations.Count != Combinations.Count)
+            {
+                Console.WriteLine("Combinations reduced to " + newListCount + " because of Max Potion Type Count of " + Config?.MaxPotionTypeCount);
+                Combinations = tempCombinations;
+                PotionRecipeCount = newPotionRecipeCount;
+                PoisonRecipeCount = newPoisonRecipeCount;
+                ImpurepotionRecipeCount = newImpurepotionRecipeCount;
             }
             Console.WriteLine("Creating Leveled lists...");
             IEnumerable<IBookGetter> books = from book in state.LoadOrder.PriorityOrder.Book().WinningOverrides() where book.FormKey.Equals(new FormKey(new ModKey("Skyrim", ModType.Master), 0x0F5CB1)) select book;
@@ -136,7 +193,7 @@ namespace AddNewRecipes
                 mainpotionRecipeLVLI[k].Global = mainpotionGlobal;
                 mainpotionRecipeLVLI[k].EditorID = "mainpotionRecipeList" + k;
             }
-            /* Must split sub leveled lists because it can only hold 128 items */
+            /* Must split sub leveled lists because it can only hold 255 items */
             uint[] potionRecipeListCount = new uint[mods.Length];
             uint[] poisonRecipeListCount = new uint[mods.Length];
             uint[] impurepotionRecipeListCount = new uint[mods.Length];
@@ -160,12 +217,12 @@ namespace AddNewRecipes
             List<GlobalInt[]> impurepotionGlobals = new List<GlobalInt[]>();
             for (int j = 0; j < mods.Length; j++)
             {
-                potionRecipeListCount[j] = PotionRecipeCount / 128  + 1;
-                poisonRecipeListCount[j] = PoisonRecipeCount / 128 + 1;
-                impurepotionRecipeListCount[j] = ImpurepotionRecipeCount / 128 + 1;
+                potionRecipeListCount[j] = PotionRecipeCount / LeveledListSize + 1;
+                poisonRecipeListCount[j] = PoisonRecipeCount / LeveledListSize + 1;
+                impurepotionRecipeListCount[j] = ImpurepotionRecipeCount / LeveledListSize + 1;
                 potionGlobals.Add(new GlobalInt[potionRecipeListCount[j]]);
                 potionRecipeLVLIs.Add(new LeveledItem[potionRecipeListCount[j]]);
-                masterpotionRecipeListCount[j] = ((((potionRecipeListCount[j] + poisonRecipeListCount[j] + impurepotionRecipeListCount[j]) ) / 128) + 1);
+                masterpotionRecipeListCount[j] = ((((potionRecipeListCount[j] + poisonRecipeListCount[j] + impurepotionRecipeListCount[j])) / LeveledListSize) + 1);
                 masterpotionRecipeLVLIs.Add(new LeveledItem[masterpotionRecipeListCount[j]]);
                 masterpotionRecipeLVLIentries.Add(new LeveledItemEntry[masterpotionRecipeListCount[j]]);
                 masterpotionRecipeLVLIentriesdata.Add(new LeveledItemEntryData[masterpotionRecipeListCount[j]]);
@@ -248,17 +305,6 @@ namespace AddNewRecipes
                 Console.WriteLine("Splitting potions into lists (" + potionRecipeListCount[j] + " " + poisonRecipeListCount[j] + " " + impurepotionRecipeListCount[j] + ")");
             }
             Dictionary<string, int> nameCache = new Dictionary<string, int>();
-            int RecipeMakeCount = 0, splitIndex = Combinations.Count / (int)Config?.ESPCount!, splitIndexCount = 0;
-            if(Config?.RandomizeList == true)
-                Combinations.Shuffle();
-            if (Config?.RecipePercentage < 100)
-            {
-                int count = Combinations.Count;
-                int percentOfCombinations = (int)(count * (double)(0.01 * Config?.RecipePercentage!));
-                Combinations.RemoveRange(percentOfCombinations, count - percentOfCombinations);
-                Percent = (int)(Combinations.Count * Config?.OutputPercentage!);
-                splitIndex = Combinations.Count / (int)Config?.ESPCount!;
-            }
             foreach (IngredientCombination ic in Combinations)
             {
                 if (i % Percent == 0)
@@ -288,12 +334,6 @@ namespace AddNewRecipes
                 int nameIndex = 0;
                 if (nameCache.TryGetValue(name, out nameIndex))
                 {
-                    if (nameIndex > Config?.MaxPotionTypeCount)
-                    {
-                        RecipeMakeCount--;
-                        i++;
-                        continue;
-                    }
                     nameCache[name] = nameIndex + 1;
                     name = name + nameCache[name];
                 }
@@ -455,21 +495,21 @@ namespace AddNewRecipes
                 {
 
                     case 0:
-                        potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / 128].Reference = potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / 128].FormKey;
-                        potionRecipeLVLIentries.ElementAt(modIndex)[potionIndex[modIndex] / 128].Data = potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / 128];
-                        potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / 128].Entries?.Add(lie);
+                        potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / LeveledListSize].Reference = potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / LeveledListSize].FormKey;
+                        potionRecipeLVLIentries.ElementAt(modIndex)[potionIndex[modIndex] / LeveledListSize].Data = potionRecipeLVLIentriesdata.ElementAt(modIndex)[potionIndex[modIndex] / LeveledListSize];
+                        potionRecipeLVLIs.ElementAt(modIndex)[potionIndex[modIndex] / LeveledListSize].Entries?.Add(lie);
                         potionIndex[modIndex]++;
                         break;
                     case 1:
-                        poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Reference = poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / 128].FormKey;
-                        poisonRecipeLVLIentries.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Data = poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / 128 ];
-                        poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / 128].Entries?.Add(lie);
+                        poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / LeveledListSize].Reference = poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / LeveledListSize].FormKey;
+                        poisonRecipeLVLIentries.ElementAt(modIndex)[poisonIndex[modIndex] / LeveledListSize].Data = poisonRecipeLVLIentriesdata.ElementAt(modIndex)[poisonIndex[modIndex] / LeveledListSize];
+                        poisonRecipeLVLIs.ElementAt(modIndex)[poisonIndex[modIndex] / LeveledListSize].Entries?.Add(lie);
                         poisonIndex[modIndex]++;
                         break;
                     case 2:
-                        impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Reference = impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].FormKey;
-                        impurepotionRecipeLVLIentries.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Data = impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128];
-                        impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / 128].Entries?.Add(lie);
+                        impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / LeveledListSize].Reference = impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / LeveledListSize].FormKey;
+                        impurepotionRecipeLVLIentries.ElementAt(modIndex)[impurepotionIndex[modIndex] / LeveledListSize].Data = impurepotionRecipeLVLIentriesdata.ElementAt(modIndex)[impurepotionIndex[modIndex] / LeveledListSize];
+                        impurepotionRecipeLVLIs.ElementAt(modIndex)[impurepotionIndex[modIndex] / LeveledListSize].Entries?.Add(lie);
                         impurepotionIndex[modIndex]++;
                         break;
                 }
@@ -482,7 +522,7 @@ namespace AddNewRecipes
             LeveledItem modifiedList = mods[0].LeveledItems.GetOrAddAsOverride(allList);
 
             int addCount = 0;
-            
+
             for (int j = 0; j < mods.Length; j++)
             {
                 uint potionIndex1 = 0;
@@ -492,7 +532,7 @@ namespace AddNewRecipes
                 {
                     masterpotionRecipeLVLIentriesdata.ElementAt(j)[l].Reference = masterpotionRecipeLVLIs.ElementAt(j)[l].FormKey;
                     masterpotionRecipeLVLIentries.ElementAt(j)[l].Data = masterpotionRecipeLVLIentriesdata.ElementAt(j)[l];
-                    for (int k = 0; k < 128; k++)
+                    for (int k = 0; k < LeveledListSize; k++)
                     {
                         if (potionIndex1 < potionRecipeLVLIentries.ElementAt(j).Length)
                             masterpotionRecipeLVLIs.ElementAt(j)[l].Entries?.Add(potionRecipeLVLIentries.ElementAt(j)[potionIndex1++]);
@@ -696,7 +736,7 @@ namespace AddNewRecipes
                         Program.PotionRecipeCount++;
                         Program.OurMutex2.ReleaseMutex();
                     }
-                    if(Program.Config?.MinimalRecipeText == false)
+                    if (Program.Config?.MinimalRecipeText == false)
                         potionString += "</font><font face='$HandwrittenFont'><font size='26'><br> to make " + prefix + " of: <br></font><font face='$HandwrittenFont'><font size='26'>";
                     else
                         potionString += "<br>";
