@@ -51,6 +51,7 @@ namespace AddNewRecipes
             catch (FileNotFoundException)
             {
                 Console.WriteLine("Cannot find settings file, using default values.");
+                Console.WriteLine("Patcher output will be written to Synthesis workspace.");
             }
 
             ModKey[] modkeys = new ModKey[(int)Config?.ESPCount!];
