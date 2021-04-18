@@ -15,6 +15,7 @@ namespace AddNewRecipes
         public bool LearnEffectsFromRecipe = true;
         public bool HasValueAfterRead = true;
         public bool MinimalRecipeText = false;
+        public int MaxEffectNameCount = 5;
         public int MinChance = 5;
         public int MaxChance = 25;
         public List<String> ContainerEditorIds = new List<string> { "TreasBanditChest", "TreasDraugrChest" };
