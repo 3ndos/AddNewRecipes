@@ -733,15 +733,15 @@ namespace AddNewRecipes
                         potionString += "<br>";
                     string potionName = "Recipe: ";//Define recipe name
                     for (int k = 0; k < mgeflist.Count; k++)
-                    {
-                        if (k+1 > Program.Config?.MaxEffectNameCount && k > 0)
-                            break;
+                    { 
                         if (k > 0)
                         {
-                            potionName += " and ";
+                            if (k + 1 <= Program.Config?.MaxEffectNameCount)
+                                potionName += " and ";
                             potionString += "<br>";
                         }
-                        potionName += mgeflist[k];
+                        if (k + 1 <= Program.Config?.MaxEffectNameCount)
+                            potionName += mgeflist[k];
                         potionString += mgeflist[k];
                     }
                     string sstring = "";
@@ -843,10 +843,12 @@ namespace AddNewRecipes
                         {
                             if (k > 0)
                             {
-                                potionName += " and ";
+                                if (k + 1 <= Program.Config?.MaxEffectNameCount)
+                                    potionName += " and ";
                                 potionString += "<br>";
                             }
-                            potionName += mgeflist[k];
+                            if (k + 1 <= Program.Config?.MaxEffectNameCount)
+                                potionName += mgeflist[k];
                             potionString += mgeflist[k];
                         }
                         string sstring = "";
